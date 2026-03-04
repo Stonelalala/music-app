@@ -1,0 +1,48 @@
+name: music
+description: "Music player app for music-tag backend"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # 状态管理
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # 网络
+  dio: ^5.8.0+1
+
+  # 路由
+  go_router: ^14.8.1
+
+  # 音频播放
+  just_audio: ^0.9.44
+  audio_service: ^0.18.17
+  just_audio_background: ^0.0.1-beta.14
+
+  # 图片缓存
+  cached_network_image: ^3.4.1
+
+  # 安全本地存储（token & cookie）
+  flutter_secure_storage: ^9.2.4
+
+  # 工具
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.6.1
+
+flutter:
+  uses-material-design: true
