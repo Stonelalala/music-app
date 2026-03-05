@@ -27,6 +27,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   StreamSubscription? _playingSubscription;
   String? _lastTrackId;
 
+  // 进度条拖动优化：记录本地拖动值
+  double? _draggingValue;
+
   @override
   void initState() {
     super.initState();
@@ -57,17 +60,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  void didUpdateWidget(PlayerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
     _checkAndFetchLyrics();
   }
 
   void _checkAndFetchLyrics() {
-    final track = ref.watch(playerHandlerProvider).currentTrack;
+    final handler = ref.read(playerHandlerProvider);
+    final track = handler.currentTrack;
     if (track != null && track.id != _lastTrackId) {
+      debugPrint('Track changed in PlayerPage: ${track.title}');
       _lastTrackId = track.id;
-      _parsedLyrics = [];
-      _currentLyricIndex = -1;
+      setState(() {
+        _parsedLyrics = [];
+        _currentLyricIndex = -1;
+      });
       _fetchLyrics(track.id);
     }
   }
@@ -123,11 +130,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   Widget build(BuildContext context) {
-    _checkAndFetchLyrics();
+    // 监听 handler 变化以触发 UI 刷新
     final handler = ref.watch(playerHandlerProvider);
     final auth = ref.watch(authServiceProvider);
+    
+    // 每次 build 检查歌曲是否变化（切歌）
+    _checkAndFetchLyrics();
+    
     final track = handler.currentTrack;
-
     if (track == null) return const Scaffold();
 
     final baseUrl = auth.baseUrl ?? '';
@@ -135,11 +145,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface, // Follow theme background
+      backgroundColor: colorScheme.surface,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 72, // 增加高度，避免标题被打孔摄像头遮挡
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: 72,
         leading: IconButton(
           icon: Icon(
             Icons.keyboard_arrow_down,
@@ -160,107 +172,79 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           const SizedBox(width: 8),
         ],
         centerTitle: true,
-        title: Column(
-          children: [
-            Text(
-              '正在播放',
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontSize: 10,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              track.album,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
+        title: Builder(
+          builder: (context) {
+            final currentTrack = handler.currentTrack ?? track;
+            return RichText(
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-            ),
-          ],
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: currentTrack.title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' - ${currentTrack.artist}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isSmallScreen = constraints.maxHeight < 680;
-            final cdSize = isSmallScreen ? 160.0 : 240.0;
-            final lyricsHeight = isSmallScreen ? 160.0 : 280.0;
-            final spacingHeight = isSmallScreen ? 8.0 : 16.0;
+            final cdSize = isSmallScreen ? 140.0 : 200.0;
+            final itemHeight = isSmallScreen ? 28.0 : 32.0;
+            final lyricsHeight = itemHeight * 5;
+            final spacingHeight = isSmallScreen ? 4.0 : 12.0;
 
             return Column(
               children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        SizedBox(height: spacingHeight),
-                        // CD Disk with Glow Effect
-                        _buildCDDiskPremium(
-                          track,
-                          baseUrl,
-                          token,
-                          colorScheme.primary,
-                          cdSize,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // CD Disk with Glow Effect
+                      _buildCDDiskPremium(
+                        handler.currentTrack ?? track,
+                        baseUrl,
+                        token,
+                        colorScheme.primary,
+                        cdSize,
+                        colorScheme,
+                      ),
+                      SizedBox(height: spacingHeight * 2),
+                      // Lyrics View
+                      SizedBox(
+                        height: lyricsHeight,
+                        child: _buildLyricViewPremium(
                           colorScheme,
+                          isSmallScreen ? 14.0 : 16.0,
+                          itemHeight,
+                          lyricsHeight,
                         ),
-                        SizedBox(height: spacingHeight),
-                        // Song titles
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Column(
-                            children: [
-                              Text(
-                                track.title,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: colorScheme.onSurface,
-                                  fontSize: isSmallScreen ? 20 : 28,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                track.artist,
-                                style: TextStyle(
-                                  color: colorScheme.primary,
-                                  fontSize: isSmallScreen ? 14 : 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: spacingHeight),
-                        // Lyrics View
-                        SizedBox(
-                          height: lyricsHeight,
-                          child: _buildLyricViewPremium(
-                            colorScheme,
-                            isSmallScreen ? 15.0 : 17.0,
-                            isSmallScreen ? 30.0 : 34.0,
-                            lyricsHeight,
-                          ),
-                        ),
-                        // Buffer for control card overlap
-                        const SizedBox(height: 20),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 // Bottom Control Card (Translucent, responsive theme)
                 _buildControlCard(
                   context,
                   handler,
-                  track,
+                  handler.currentTrack ?? track,
                   colorScheme,
                   isSmallScreen,
                 ),
@@ -386,7 +370,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
+              horizontal: 16.0,
               vertical: 20.0,
             ),
             child: Column(
@@ -398,29 +382,47 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   builder: (context, snap) {
                     final pos = snap.data ?? Duration.zero;
                     final dur = Duration(seconds: track.duration.toInt());
+                    
+                    // 如果正在拖动，使用拖动时的值，否则使用播放器当前进度
+                    final currentSeconds = _draggingValue ?? pos.inSeconds.toDouble();
+                    
                     return Column(
                       children: [
                         SliderTheme(
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 4,
                             thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 0,
+                              enabledThumbRadius: 6, // 增加滑块大小，提升交互感
                             ),
                             activeTrackColor: colorScheme.primary,
                             inactiveTrackColor: colorScheme.onSurface
                                 .withOpacity(0.1),
-                            overlayShape: SliderComponentShape.noOverlay,
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                           ),
                           child: Slider(
-                            value: pos.inSeconds.toDouble().clamp(
-                              0,
-                              dur.inSeconds.toDouble(),
+                            value: currentSeconds.clamp(
+                              0.0,
+                              dur.inSeconds.toDouble() > 0 ? dur.inSeconds.toDouble() : 1.0,
                             ),
                             max: dur.inSeconds.toDouble() > 0
                                 ? dur.inSeconds.toDouble()
                                 : 1.0,
-                            onChanged: (v) =>
-                                handler.seek(Duration(seconds: v.toInt())),
+                            onChangeStart: (v) {
+                              setState(() {
+                                _draggingValue = v;
+                              });
+                            },
+                            onChanged: (v) {
+                              setState(() {
+                                _draggingValue = v;
+                              });
+                            },
+                            onChangeEnd: (v) {
+                              handler.seek(Duration(seconds: v.toInt()));
+                              setState(() {
+                                _draggingValue = null;
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -428,7 +430,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              _formatDuration(pos),
+                              _formatDuration(Duration(seconds: currentSeconds.toInt())),
                               style: TextStyle(
                                 color: colorScheme.onSurfaceVariant,
                                 fontSize: 11,
@@ -473,34 +475,58 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                       ),
                       onPressed: () => handler.skipToPrevious(),
                     ),
-                    StreamBuilder<bool>(
-                      stream: handler.player.playingStream,
-                      builder: (context, snap) {
-                        final playing = snap.data ?? false;
-                        return GestureDetector(
-                          onTap: () =>
-                              playing ? handler.pause() : handler.play(),
-                          child: Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colorScheme.primary.withOpacity(0.4),
-                                  blurRadius: 16,
+                    StreamBuilder<PlayerState>(
+                      stream: handler.player.playerStateStream,
+                      builder: (context, snapshot) {
+                        final playerState = snapshot.data;
+                        final processingState = playerState?.processingState;
+                        final playing = playerState?.playing ?? false;
+
+                        // 是否处于加载或缓冲状态
+                        final isLoading = processingState == ProcessingState.buffering ||
+                                         processingState == ProcessingState.loading;
+
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // 固定 72x72 的空间，防止加载环出现/消失时 UI 整体发生位移
+                            SizedBox(
+                              width: 72,
+                              height: 72,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 300),
+                                opacity: isLoading ? 1.0 : 0.0,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.primary,
+                                  strokeCap: StrokeCap.round,
                                 ),
-                              ],
+                              ),
                             ),
-                            child: Icon(
-                              playing
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: colorScheme.onPrimary,
-                              size: 36,
+                            GestureDetector(
+                              onTap: () => playing ? handler.pause() : handler.play(),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colorScheme.primary.withOpacity(0.4),
+                                      blurRadius: 16,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                  color: colorScheme.onPrimary,
+                                  size: 36,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         );
                       },
                     ),
@@ -561,6 +587,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     return ListView.builder(
       controller: _lyricScrollController,
       itemCount: _parsedLyrics.length,
+      physics: const NeverScrollableScrollPhysics(), // Prevent conflict with parent scroll
       padding: EdgeInsets.symmetric(vertical: (lyricsHeight - itemHeight) / 2),
       itemExtent: itemHeight,
       itemBuilder: (context, i) {

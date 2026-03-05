@@ -672,11 +672,15 @@ class _TrackTile extends ConsumerWidget {
                   ),
                   Row(
                     children: [
-                      Text(
-                        track.artist,
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 12,
+                      Flexible(
+                        child: Text(
+                          track.artist,
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),

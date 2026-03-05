@@ -111,18 +111,25 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                           child: Row(
                             children: [
                               if (_isExpanded)
-                                IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isExpanded = false;
-                                    });
-                                  },
-                                  icon: const Icon(
-                                    Icons.chevron_right,
-                                    color: AppTheme.textSecondary,
+                                SizedBox(
+                                  width: 24, // Even narrower
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(), // Critical to remove default constraints
+                                    onPressed: () {
+                                      setState(() {
+                                        _isExpanded = false;
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.chevron_right,
+                                      color: AppTheme.textSecondary,
+                                      size: 18, // Slightly smaller
+                                    ),
                                   ),
                                 ),
-                              if (_isExpanded) const SizedBox(width: 4),
+                              if (_isExpanded) const SizedBox(width: 4), // Tiny gap to CD
+                              if (!_isExpanded) const SizedBox(width: 4), // Center the 64px ring in 72px container
                               // Album Art with Progress Ring
                               StreamBuilder<Duration>(
                                 stream: AudioService.position,
@@ -177,10 +184,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                             width:
                                                 52, // Slightly smaller than progress ring
                                             height: 52,
-                                            margin: EdgeInsets.only(
-                                              left: _isExpanded ? 0 : 8,
-                                              right: _isExpanded ? 0 : 8,
-                                            ),
+
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
                                               // 仅在折叠态提供一个阴影以增强悬浮感
@@ -246,27 +250,27 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        Text(
-                                          '${item.artist} — ${item.album}',
-                                          style: const TextStyle(
-                                            color: AppTheme.textSecondary,
-                                            fontSize: 11,
+                                          Text(
+                                            '${item.artist} — ${item.album}',
+                                            style: const TextStyle(
+                                              color: AppTheme.textSecondary,
+                                              fontSize: 10, // Slightly smaller
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                                        ],
                                     ),
                                   ),
                                 ),
-                                // Play/Pause
+                                // Controls group with less padding
                                 GestureDetector(
                                   onTap: () => isPlaying
                                       ? handler.pause()
                                       : handler.play(),
                                   child: Container(
-                                    width: 44,
-                                    height: 44,
+                                    width: 36, // Smaller
+                                    height: 36,
                                     decoration: BoxDecoration(
                                       color: Theme.of(
                                         context,
@@ -280,22 +284,38 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                       color: Theme.of(
                                         context,
                                       ).colorScheme.onPrimary,
-                                      size: 28,
+                                      size: 22, // Smaller
                                     ),
                                   ),
                                 ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.playlist_play_rounded,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                    size: 24,
+                                SizedBox(
+                                  width: 32, // Narrower
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => handler.skipToNext(),
+                                    icon: Icon(
+                                      Icons.skip_next_rounded,
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                      size: 22,
+                                    ),
                                   ),
-                                  onPressed: () =>
-                                      GlobalPlaylist.show(context, ref),
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 32, // Narrower
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: Icon(
+                                      Icons.playlist_play_rounded,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                      size: 22,
+                                    ),
+                                    onPressed: () =>
+                                        GlobalPlaylist.show(context, ref),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
                               ],
                             ],
                           ),

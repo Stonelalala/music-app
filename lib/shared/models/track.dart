@@ -39,6 +39,20 @@ class Track {
     relativePath: json['relative_path'] as String?,
   );
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'artist': artist,
+    'album': album,
+    'extension': extension,
+    'duration': duration,
+    'size': size,
+    'scrape_status': scrapeStatus,
+    'hasLyrics': hasLyrics,
+    'filepath': filepath,
+    'relative_path': relativePath,
+  };
+
   /// 格式化时长 mm:ss
   String get durationText {
     final s = duration.toInt();

@@ -2,13 +2,17 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/player/player_service.dart';
+import 'core/player/cache_service.dart';
 import 'core/auth/auth_service.dart';
 import 'core/router/router.dart';
 import 'shared/theme/app_theme.dart';
+import 'features/settings/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
 
   MusicPlayerHandler handler;
 
@@ -30,7 +34,10 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [playerHandlerProvider.overrideWithValue(handler)],
+      overrides: [
+        playerHandlerProvider.overrideWith((ref) => handler),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
       child: const MusicApp(),
     ),
   );
@@ -48,8 +55,19 @@ class _MusicAppState extends ConsumerState<MusicApp> {
   void initState() {
     super.initState();
     // 仅在初始化时执行一次恢复
-    Future.microtask(() {
-      ref.read(authServiceProvider.notifier).init();
+    Future.microtask(() async {
+      await ref.read(authServiceProvider.notifier).init();
+      
+      // 恢复后立即同步给播放器
+      final auth = ref.read(authServiceProvider);
+      if (auth.isAuthenticated && auth.token != null && auth.baseUrl != null) {
+        ref.read(playerHandlerProvider).setAuth(auth.token!, auth.baseUrl!);
+      }
+      
+      // 启动时初次同步缓存配置
+      final cacheService = ref.read(cacheServiceProvider);
+      final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
+      ref.read(playerHandlerProvider).setCacheConfig(cacheService, maxBytes);
     });
   }
 
@@ -62,11 +80,18 @@ class _MusicAppState extends ConsumerState<MusicApp> {
       }
     });
 
+    // 监听缓存设置变化，同步给播放器
+    ref.listen(settingsProvider, (previous, next) {
+      final cacheService = ref.read(cacheServiceProvider);
+      final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
+      ref.read(playerHandlerProvider).setCacheConfig(cacheService, maxBytes);
+    });
+
     final router = ref.watch(routerProvider);
     final themeType = ref.watch(themeTypeProvider);
 
     return MaterialApp.router(
-      title: 'Music',
+      title: '石头音乐',
       theme: AppTheme.getTheme(themeType),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
