@@ -63,10 +63,11 @@ class _MusicAppState extends ConsumerState<MusicApp> {
     });
 
     final router = ref.watch(routerProvider);
+    final themeType = ref.watch(themeTypeProvider);
 
     return MaterialApp.router(
       title: 'Music',
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.getTheme(themeType),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

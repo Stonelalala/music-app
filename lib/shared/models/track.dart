@@ -9,6 +9,7 @@ class Track {
   final int scrapeStatus;
   final bool hasLyrics;
   final String? filepath;
+  final String? relativePath;
 
   const Track({
     required this.id,
@@ -21,6 +22,7 @@ class Track {
     required this.scrapeStatus,
     required this.hasLyrics,
     this.filepath,
+    this.relativePath,
   });
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
@@ -34,6 +36,7 @@ class Track {
     scrapeStatus: (json['scrape_status'] as int?) ?? 0,
     hasLyrics: (json['hasLyrics'] as bool?) ?? false,
     filepath: json['filepath'] as String?,
+    relativePath: json['relative_path'] as String?,
   );
 
   /// 格式化时长 mm:ss

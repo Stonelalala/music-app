@@ -4,7 +4,8 @@ import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../core/repositories/track_repository.dart';
 import '../../shared/models/track.dart';
-import '../../shared/theme/app_theme.dart';
+import 'widgets/track_edit_sheet.dart';
+import 'widgets/library_tools_sheet.dart';
 
 final tracksDataProvider = FutureProvider.family<TracksResponse, String?>(
   (ref, folder) => ref.watch(trackRepositoryProvider).getTracks(folder: folder),
@@ -18,7 +19,7 @@ class LibraryPage extends ConsumerStatefulWidget {
 }
 
 class _LibraryPageState extends ConsumerState<LibraryPage> {
-  String _activeTab = 'Songs';
+  String _activeTab = '歌曲';
   String? _selectedFolder;
 
   bool _isSearching = false;
@@ -47,9 +48,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   @override
   Widget build(BuildContext context) {
     final tracksAsync = ref.watch(tracksDataProvider(_selectedFolder));
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: AppTheme.bgBase,
       body: SafeArea(
         child: Stack(
           children: [
@@ -57,50 +58,64 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               children: [
                 // Navigation Tabs
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: ['Artists', 'Albums', 'Songs', 'Folders'].map((
-                        tab,
-                      ) {
-                        final isSelected = _activeTab == tab;
-                        return GestureDetector(
-                          onTap: () => setState(() {
-                            _activeTab = tab;
-                            if (tab != 'Songs') {
-                              _filterArtist = null;
-                              _filterAlbum = null;
-                            }
-                          }),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppTheme.surfaceElevated
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              tab,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? AppTheme.accent
-                                    : AppTheme.textSecondary,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
+                  padding: const EdgeInsets.only(top: 20, bottom: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: ['艺术家', '专辑', '歌曲', '文件夹'].map((tab) {
+                              final isSelected = _activeTab == tab;
+                              return GestureDetector(
+                                onTap: () => setState(() {
+                                  _activeTab = tab;
+                                  if (tab != '歌曲') {
+                                    _filterArtist = null;
+                                    _filterAlbum = null;
+                                  }
+                                }),
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? colorScheme.primaryContainer
+                                              .withOpacity(0.3)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    tab,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
-                        );
-                      }).toList(),
-                    ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => LibraryToolsSheet.show(context),
+                        icon: Icon(
+                          Icons.auto_fix_high_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        tooltip: '库管理工具',
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ),
                 ),
 
@@ -111,7 +126,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         child: tracksAsync.when(
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
-                          error: (e, _) => Center(child: Text('Error: $e')),
+                          error: (e, _) => Center(child: Text('错误: $e')),
                           data: (data) {
                             final allTracks = data.tracks;
                             var displayTracks = allTracks;
@@ -141,13 +156,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   .toList();
                             }
 
-                            if (_activeTab == 'Artists') {
+                            if (_activeTab == '艺术家') {
                               if (_filterArtist != null) {
-                                final artistTracks = displayTracks
-                                    .where((t) => t.artist == _filterArtist)
-                                    .toList();
                                 return ListView.builder(
-                                  itemCount: artistTracks.length + 1,
+                                  itemCount: displayTracks.length + 1,
                                   padding: const EdgeInsets.fromLTRB(
                                     16,
                                     16,
@@ -157,7 +169,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   itemBuilder: (context, i) {
                                     if (i == 0) {
                                       return _buildReturnTile(
-                                        label: 'Return to Artists',
+                                        context,
+                                        label: '返回艺术家列表',
                                         onTap: () {
                                           setState(() {
                                             _filterArtist = null;
@@ -166,8 +179,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       );
                                     }
                                     return _TrackTile(
-                                      track: artistTracks[i - 1],
-                                      allTracks: artistTracks,
+                                      track: displayTracks[i - 1],
+                                      allTracks: displayTracks,
                                       index: i - 1,
                                     );
                                   },
@@ -212,8 +225,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       });
                                     },
                                     child: _buildGridCard(
+                                      context,
                                       title: artist,
-                                      subtitle: '$count songs',
+                                      subtitle: '$count 首歌曲',
                                       imageUrl: coverUrl,
                                     ),
                                   );
@@ -221,13 +235,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               );
                             }
 
-                            if (_activeTab == 'Albums') {
+                            if (_activeTab == '专辑') {
                               if (_filterAlbum != null) {
-                                final albumTracks = displayTracks
-                                    .where((t) => t.album == _filterAlbum)
-                                    .toList();
                                 return ListView.builder(
-                                  itemCount: albumTracks.length + 1,
+                                  itemCount: displayTracks.length + 1,
                                   padding: const EdgeInsets.fromLTRB(
                                     16,
                                     16,
@@ -237,7 +248,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   itemBuilder: (context, i) {
                                     if (i == 0) {
                                       return _buildReturnTile(
-                                        label: 'Return to Albums',
+                                        context,
+                                        label: '返回专辑列表',
                                         onTap: () {
                                           setState(() {
                                             _filterAlbum = null;
@@ -246,8 +258,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       );
                                     }
                                     return _TrackTile(
-                                      track: albumTracks[i - 1],
-                                      allTracks: albumTracks,
+                                      track: displayTracks[i - 1],
+                                      allTracks: displayTracks,
                                       index: i - 1,
                                     );
                                   },
@@ -280,7 +292,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   final album = albumList[i].key;
                                   final count = albumList[i].value.length;
                                   final firstTrack = albumList[i].value.first;
-                                  final artistName = firstTrack.artist;
                                   final coverUrl =
                                       '${ref.read(authServiceProvider).baseUrl ?? ''}/api/tracks/${firstTrack.id}/cover?auth=${ref.read(authServiceProvider).token ?? ''}';
 
@@ -293,8 +304,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       });
                                     },
                                     child: _buildGridCard(
+                                      context,
                                       title: album,
-                                      subtitle: artistName,
+                                      subtitle: firstTrack.artist,
                                       imageUrl: coverUrl,
                                     ),
                                   );
@@ -302,7 +314,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               );
                             }
 
-                            if (_activeTab == 'Folders') {
+                            if (_activeTab == '文件夹') {
                               final folders = data.folders
                                   .where(
                                     (f) => f.toLowerCase().contains(
@@ -310,10 +322,25 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                     ),
                                   )
                                   .toList();
+
+                              // Use the new relativePath for precise filtering
+                              final currentTracks = allTracks.where((t) {
+                                final trackRelFolder = t.relativePath ?? '';
+                                final requestedRelFolder =
+                                    _selectedFolder ?? '';
+                                return trackRelFolder.toLowerCase() ==
+                                    requestedRelFolder.toLowerCase();
+                              }).toList();
+
+                              final foldersCount = folders.length;
+                              final tracksCount = currentTracks.length;
+                              final hasReturn = _selectedFolder != null;
+
                               return ListView.builder(
                                 itemCount:
-                                    folders.length +
-                                    (_selectedFolder != null ? 1 : 0),
+                                    (hasReturn ? 1 : 0) +
+                                    foldersCount +
+                                    tracksCount,
                                 padding: const EdgeInsets.fromLTRB(
                                   16,
                                   16,
@@ -321,16 +348,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   100,
                                 ),
                                 itemBuilder: (context, i) {
-                                  if (_selectedFolder != null && i == 0) {
+                                  int index = i;
+
+                                  if (hasReturn && index == 0) {
                                     return ListTile(
-                                      leading: const Icon(
+                                      leading: Icon(
                                         Icons.folder_open,
-                                        color: AppTheme.accent,
+                                        color: colorScheme.primary,
                                       ),
-                                      title: const Text(
-                                        '.. (Return)',
+                                      title: Text(
+                                        '.. (返回上级)',
                                         style: TextStyle(
-                                          color: AppTheme.textPrimary,
+                                          color: colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -340,9 +369,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                             final parts = _selectedFolder!
                                                 .split('/');
                                             parts.removeLast();
-                                            _selectedFolder = parts.isEmpty
-                                                ? null
-                                                : parts.join('/');
+                                            _selectedFolder = parts.join('/');
                                           } else {
                                             _selectedFolder = null;
                                           }
@@ -350,32 +377,39 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       },
                                     );
                                   }
-                                  final folder =
-                                      folders[_selectedFolder != null
-                                          ? i - 1
-                                          : i];
-                                  return ListTile(
-                                    leading: const Icon(
-                                      Icons.folder,
-                                      color: AppTheme.accent,
-                                    ),
-                                    title: Text(
-                                      folder,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontWeight: FontWeight.bold,
+                                  if (hasReturn) index--;
+
+                                  if (index < foldersCount) {
+                                    final folder = folders[index];
+                                    return ListTile(
+                                      leading: Icon(
+                                        Icons.folder,
+                                        color: colorScheme.primary,
                                       ),
-                                    ),
-                                    onTap: () {
-                                      setState(() {
-                                        if (_selectedFolder == null) {
-                                          _selectedFolder = folder;
-                                        } else {
+                                      title: Text(
+                                        folder,
+                                        style: TextStyle(
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        setState(() {
                                           _selectedFolder =
-                                              '$_selectedFolder/$folder';
-                                        }
-                                      });
-                                    },
+                                              _selectedFolder == null
+                                              ? folder
+                                              : '$_selectedFolder/$folder';
+                                        });
+                                      },
+                                    );
+                                  }
+                                  index -= foldersCount;
+
+                                  final track = currentTracks[index];
+                                  return _TrackTile(
+                                    track: track,
+                                    allTracks: currentTracks,
+                                    index: index,
                                   );
                                 },
                               );
@@ -403,11 +437,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ),
               ],
             ),
-            // Floating Search Button (Positioned at bottom-right above the menu)
+            // Floating Search Button
             Positioned(
               right: 16,
-              bottom: 240, // More space to avoid overlap with mini player area
-              child: _buildFloatingSearchBar(),
+              bottom: 240,
+              child: _buildFloatingSearchBar(context, colorScheme),
             ),
           ],
         ),
@@ -415,14 +449,17 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  Widget _buildFloatingSearchBar() {
+  Widget _buildFloatingSearchBar(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       width: _isSearching ? MediaQuery.of(context).size.width - 32 : 56,
       height: 56,
       decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated,
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
@@ -436,29 +473,22 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ? Row(
               children: [
                 const SizedBox(width: 16),
-                const Icon(Icons.search, color: AppTheme.accent),
+                Icon(Icons.search, color: colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
                     autofocus: true,
-                    style: const TextStyle(color: AppTheme.textPrimary),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) {
-                      FocusScope.of(context).unfocus();
-                      setState(() {
-                        _isSearching = false;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                      hintText: 'Search library...',
-                      hintStyle: TextStyle(color: AppTheme.textSecondary),
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      hintText: '搜索库...',
+                      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
                       border: InputBorder.none,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
                   onPressed: () {
                     setState(() {
                       _isSearching = false;
@@ -475,21 +505,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   _isSearching = true;
                 });
               },
-              child: const Icon(Icons.search, color: AppTheme.accent),
+              child: Icon(Icons.search, color: colorScheme.primary),
             ),
     );
   }
 
-  Widget _buildReturnTile({
+  Widget _buildReturnTile(
+    BuildContext context, {
     required String label,
     required VoidCallback onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
-      leading: const Icon(Icons.arrow_back, color: AppTheme.accent),
+      leading: Icon(Icons.arrow_back, color: colorScheme.primary),
       title: Text(
         label,
-        style: const TextStyle(
-          color: AppTheme.textPrimary,
+        style: TextStyle(
+          color: colorScheme.onSurface,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -497,34 +529,34 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  Widget _buildGridCard({
+  Widget _buildGridCard(
+    BuildContext context, {
     required String title,
     required String subtitle,
     required String imageUrl,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: AppTheme.surfaceElevated,
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Background Image
           Image.network(
             imageUrl,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
-              color: AppTheme.bgBase,
-              child: const Icon(
+              color: colorScheme.surface,
+              child: Icon(
                 Icons.music_note,
-                color: AppTheme.accent,
+                color: colorScheme.primary,
                 size: 48,
               ),
             ),
           ),
-          // Gradient Overlay
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -539,7 +571,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
               ),
             ),
           ),
-          // Text Content
           Positioned(
             left: 16,
             right: 16,
@@ -581,7 +612,6 @@ class _TrackTile extends ConsumerWidget {
   final Track track;
   final List<Track> allTracks;
   final int index;
-
   const _TrackTile({
     required this.track,
     required this.allTracks,
@@ -591,36 +621,37 @@ class _TrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.read(authServiceProvider);
-    final baseUrl = auth.baseUrl ?? '';
-    final token = auth.token ?? '';
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated,
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.15),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.border, width: 0.5),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withOpacity(0.1),
+          width: 0.5,
+        ),
       ),
       child: InkWell(
-        onTap: () {
-          final handler = ref.read(playerHandlerProvider);
-          handler.loadQueue(allTracks, startIndex: index);
-        },
+        onTap: () => ref
+            .read(playerHandlerProvider)
+            .loadQueue(allTracks, startIndex: index),
         child: Row(
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                '$baseUrl/api/tracks/${track.id}/cover?auth=$token',
+                '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
                 width: 52,
                 height: 52,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                   width: 52,
                   height: 52,
-                  color: AppTheme.bgBase,
-                  child: const Icon(Icons.music_note, color: AppTheme.accent),
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Icon(Icons.music_note, color: colorScheme.primary),
                 ),
               ),
             ),
@@ -631,18 +662,20 @@ class _TrackTile extends ConsumerWidget {
                 children: [
                   Text(
                     track.title,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Row(
                     children: [
                       Text(
                         track.artist,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -653,16 +686,24 @@ class _TrackTile extends ConsumerWidget {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.accent.withValues(alpha: 0.15),
+                          color: colorScheme.primary.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
-                          'FLAC',
+                        child: Text(
+                          track.extension.toUpperCase().replaceAll('.', ''),
                           style: TextStyle(
-                            color: AppTheme.accent,
+                            color: colorScheme.primary,
                             fontSize: 8,
                             fontWeight: FontWeight.bold,
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        track.sizeText,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          fontSize: 10,
                         ),
                       ),
                     ],
@@ -670,16 +711,21 @@ class _TrackTile extends ConsumerWidget {
                 ],
               ),
             ),
-            const Icon(
-              Icons.favorite_border,
-              color: AppTheme.textSecondary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            const Icon(
-              Icons.more_vert,
-              color: AppTheme.textSecondary,
-              size: 20,
+            IconButton(
+              icon: Icon(
+                Icons.more_vert,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+              onPressed: () {
+                TrackEditSheet.show(
+                  context,
+                  track,
+                  onSaved: () {
+                    ref.invalidate(tracksDataProvider);
+                  },
+                );
+              },
             ),
           ],
         ),

@@ -5,8 +5,9 @@ import '../auth/auth_service.dart';
 class ApiClient {
   late final Dio _dio;
   final AuthService _auth;
+  final String baseUrl;
 
-  ApiClient(this._auth, String baseUrl) {
+  ApiClient(this._auth, this.baseUrl) {
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
@@ -66,6 +67,9 @@ class ApiClient {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final authState = ref.watch(authServiceProvider);
   final auth = ref.read(authServiceProvider.notifier);
-  final baseUrl = authState.baseUrl ?? 'http://localhost:3000';
+
+  // Use 10.0.2.2 for Android emulator to reach host, default port is 8002
+  // We prioritize the user's saved baseUrl if available
+  final baseUrl = authState.baseUrl ?? 'http://10.0.2.2:8002';
   return ApiClient(auth, baseUrl);
 });

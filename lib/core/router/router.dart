@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../features/discovery/discovery_page.dart';
 import '../../features/tasks/tasks_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/player/player_page.dart';
+import '../../features/library/duplicate_cleaning_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // 注意：不再在这里 ref.watch(authServiceProvider)，否则会导致 GoRouter 实例反复重建
@@ -44,16 +46,34 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DiscoveryPage(),
           ),
           GoRoute(
-            path: '/tasks',
-            builder: (context, state) => const TasksPage(),
-          ),
-          GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsPage(),
           ),
         ],
       ),
-      GoRoute(path: '/player', builder: (context, state) => const PlayerPage()),
+      GoRoute(path: '/tasks', builder: (context, state) => const TasksPage()),
+      GoRoute(
+        path: '/player',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const PlayerPage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: animation.drive(
+                Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).chain(CurveTween(curve: Curves.easeOutCubic)),
+              ),
+              child: child,
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/library/duplicates',
+        builder: (context, state) => const DuplicateCleaningPage(),
+      ),
     ],
   );
 });

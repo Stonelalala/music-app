@@ -2,8 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/mini_player.dart';
+import '../home/home_page.dart';
+import '../library/library_page.dart';
+import '../discovery/discovery_page.dart';
+import '../settings/settings_page.dart';
 
 class MainShell extends ConsumerWidget {
   final Widget child;
@@ -12,6 +15,7 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
+    final colorScheme = Theme.of(context).colorScheme;
 
     int currentIndex = 0;
     if (location.startsWith('/home')) currentIndex = 0;
@@ -22,11 +26,19 @@ class MainShell extends ConsumerWidget {
       currentIndex = 2; // Tasks map to Discovery tab
 
     return Scaffold(
-      backgroundColor: AppTheme.bgBase,
+      backgroundColor: colorScheme.surface,
       body: Stack(
         children: [
-          // 页面主要内容
-          child,
+          // 页面主要内容 - 使用 IndexedStack 保持页面状态
+          IndexedStack(
+            index: currentIndex,
+            children: const [
+              HomePage(),
+              LibraryPage(),
+              DiscoveryPage(),
+              SettingsPage(),
+            ],
+          ),
           // 悬浮层：迷你播放器和底部导航
           Positioned(
             left: 0,
@@ -37,10 +49,9 @@ class MainShell extends ConsumerWidget {
               bottom: true,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                // 对齐到右侧（为了搜索按钮和收起的CD）
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // 迷你播放器 (会自适应宽度)
+                  // 迷你播放器
                   const MiniPlayer(),
                   // 底部导航菜单
                   Padding(
@@ -52,12 +63,12 @@ class MainShell extends ConsumerWidget {
                         child: Container(
                           height: 80,
                           decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF1E1E1E,
-                            ).withValues(alpha: 0.4),
+                            color: colorScheme.surface.withOpacity(0.6),
                             borderRadius: BorderRadius.circular(40),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.05),
+                              color: colorScheme.outlineVariant.withOpacity(
+                                0.2,
+                              ),
                               width: 1,
                             ),
                           ),
@@ -120,7 +131,10 @@ class MainShell extends ConsumerWidget {
     BuildContext context,
   ) {
     final isSelected = index == currentIndex;
-    final color = isSelected ? AppTheme.accent : AppTheme.textSecondary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isSelected
+        ? colorScheme.primary
+        : colorScheme.onSurfaceVariant;
 
     return GestureDetector(
       onTap: () {

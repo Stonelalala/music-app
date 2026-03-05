@@ -4,12 +4,35 @@ import '../../core/http/api_client.dart';
 import '../../shared/models/task.dart';
 import '../../shared/theme/app_theme.dart';
 
-final tasksListProvider = FutureProvider<List<TaskItem>>((ref) async {
-  final data = await ref
-      .watch(apiClientProvider)
-      .get<Map<String, dynamic>>('/api/tasks');
-  final list = data['data'] as List<dynamic>? ?? [];
-  return list.map((e) => TaskItem.fromJson(e as Map<String, dynamic>)).toList();
+final tasksListProvider = StreamProvider.autoDispose<List<TaskItem>>((
+  ref,
+) async* {
+  final apiClient = ref.watch(apiClientProvider);
+
+  while (true) {
+    try {
+      final data = await apiClient.get<Map<String, dynamic>>('/api/tasks');
+      final list = data['data'] as List<dynamic>? ?? [];
+      final tasks = list
+          .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      yield tasks;
+
+      // Stop polling early if all tasks are completed/failed/cancelled
+      final hasActiveTasks = tasks.any((t) => t.isRunning);
+      if (!hasActiveTasks) {
+        // Slow down polling when idle to save bandwidth, but keep watching for new tasks triggered elsewhere
+        await Future.delayed(const Duration(seconds: 5));
+      } else {
+        // Fast polling when there are active tasks
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
+    } catch (e) {
+      // Yield previous state or empty list on error to prevent UI flicker
+      yield [];
+      await Future.delayed(const Duration(seconds: 5));
+    }
+  }
 });
 
 class TasksPage extends ConsumerWidget {

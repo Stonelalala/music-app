@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
@@ -15,6 +16,8 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   MusicPlayerHandler() {
     _player.playbackEventStream.listen(_broadcastState);
+    _player.shuffleModeEnabledStream.listen((_) => _broadcastState(null));
+    _player.loopModeStream.listen((_) => _broadcastState(null));
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
         skipToNext();
@@ -105,6 +108,10 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToPrevious() async {
+    if (_player.position.inSeconds > 3) {
+      await _player.seek(Duration.zero);
+      return;
+    }
     if (_currentIndex > 0) {
       _currentIndex--;
       await _playCurrentTrack();
@@ -113,7 +120,43 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  void _broadcastState(PlaybackEvent event) {
+  Future<void> toggleShuffle() async {
+    final enabled = !_player.shuffleModeEnabled;
+    await _player.setShuffleModeEnabled(enabled);
+    if (enabled) {
+      await _player.shuffle();
+    }
+  }
+
+  Future<void> toggleLoopMode() async {
+    switch (_player.loopMode) {
+      case LoopMode.off:
+        await _player.setLoopMode(LoopMode.one);
+        break;
+      case LoopMode.one:
+        await _player.setLoopMode(LoopMode.all);
+        break;
+      case LoopMode.all:
+        await _player.setLoopMode(LoopMode.off);
+        break;
+    }
+  }
+
+  Future<String?> getLyrics(String trackId) async {
+    if (_baseUrl == null || _token == null) return null;
+    try {
+      final url = '$_baseUrl/api/tracks/$trackId/lyrics?auth=$_token';
+      final response = await Dio().get(url);
+      if (response.data != null && response.data['success'] == true) {
+        return response.data['lyrics'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Lyrics fetch error: $e');
+    }
+    return null;
+  }
+
+  void _broadcastState(dynamic _) {
     final playing = _player.playing;
     playbackState.add(
       playbackState.value.copyWith(
@@ -122,7 +165,11 @@ class MusicPlayerHandler extends BaseAudioHandler
           playing ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
         ],
-        systemActions: const {MediaAction.seek},
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.setShuffleMode,
+          MediaAction.setRepeatMode,
+        },
         androidCompactActionIndices: const [0, 1, 2],
         processingState: {
           ProcessingState.idle: AudioProcessingState.idle,
@@ -136,6 +183,14 @@ class MusicPlayerHandler extends BaseAudioHandler
         bufferedPosition: _player.bufferedPosition,
         speed: _player.speed,
         queueIndex: _currentIndex,
+        shuffleMode: _player.shuffleModeEnabled
+            ? AudioServiceShuffleMode.all
+            : AudioServiceShuffleMode.none,
+        repeatMode: {
+          LoopMode.off: AudioServiceRepeatMode.none,
+          LoopMode.one: AudioServiceRepeatMode.one,
+          LoopMode.all: AudioServiceRepeatMode.all,
+        }[_player.loopMode]!,
       ),
     );
   }

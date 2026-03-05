@@ -1,45 +1,168 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+enum ThemeType { dark, light, magenta }
+
+class ThemeService extends StateNotifier<ThemeType> {
+  static const _kTheme = 'app_theme_type_v2';
+  static final _storage = FlutterSecureStorage(
+    aOptions: const AndroidOptions(encryptedSharedPreferences: false),
+  );
+
+  ThemeService() : super(ThemeType.dark) {
+    loadTheme();
+  }
+
+  Future<void> loadTheme() async {
+    try {
+      final saved = await _storage.read(key: _kTheme);
+      if (saved != null) {
+        state = ThemeType.values.firstWhere(
+          (e) => e.name == saved,
+          orElse: () => ThemeType.dark,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading theme: $e');
+    }
+  }
+
+  Future<void> setTheme(ThemeType type) async {
+    state = type;
+    await _storage.write(key: _kTheme, value: type.name);
+  }
+}
+
+final themeTypeProvider = StateNotifierProvider<ThemeService, ThemeType>((ref) {
+  return ThemeService();
+});
+
+class ThemeInfo {
+  final ThemeType type;
+  final String name;
+  final Color primaryColor;
+
+  ThemeInfo(this.type, this.name, this.primaryColor);
+}
 
 class AppTheme {
-  // 核心色调：深翡翠绿
-  static const Color bgBase = Color(0xFF050505);
-  static const Color surface = Color(0xFF121212);
-  static const Color surfaceElevated = Color(0xFF1E1E1E);
-  static const Color border = Color(0xFF282828);
+  static List<ThemeInfo> get allThemes => [
+    ThemeInfo(ThemeType.dark, '经典深色', darkAccent),
+    ThemeInfo(ThemeType.light, '明亮模式', lightAccent),
+    ThemeInfo(ThemeType.magenta, '极客品红', magentaAccent),
+  ];
 
-  // 强调色：霓虹绿
-  static const Color accent = Color(0xFF1ED760);
-  static const Color accentText = Color(0xFF1ED760);
+  // --- Colors for Magenta Dark (Based on image) ---
+  static const Color magentaBg = Color(0xFF0A0A0A);
+  static const Color magentaSurface = Color(0xFF161618);
+  static const Color magentaSurfaceElevated = Color(0xFF1F1F22);
+  static const Color magentaAccent = Color(0xFFE91E63);
+  static const Color magentaBorder = Color(0xFF2C2C2E);
 
-  // 文本色
-  static const Color textPrimary = Colors.white;
-  static const Color textSecondary = Color(0xFFA7ADAA);
-  static const Color errorColor = Color(0xFFFF5252);
-  static const Color successColor = Color(0xFF1ED760);
+  // --- Colors for Classic Dark ---
+  static const Color darkBg = Color(0xFF050505);
+  static const Color darkSurface = Color(0xFF121212);
+  static const Color darkSurfaceElevated = Color(0xFF1E1E1E);
+  static const Color darkAccent = Color(0xFF1ED760);
+  static const Color darkBorder = Color(0xFF282828);
 
-  static ThemeData get darkTheme {
+  // --- Colors for Light Theme ---
+  static const Color lightBg = Color(0xFFF9F9F9);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightSurfaceElevated = Color(0xFFF0F0F0);
+  static const Color lightAccent = Color(0xFF2196F3);
+  static const Color lightBorder = Color(0xFFE0E0E0);
+
+  // --- Common Text Colors ---
+  static const Color textPrimaryDark = Colors.white;
+  static const Color textSecondaryDark = Color(0xFFA7ADAA);
+  static const Color textPrimaryLight = Color(0xFF212121);
+  static const Color textSecondaryLight = Color(0xFF757575);
+
+  static ThemeData getTheme(ThemeType type) {
+    switch (type) {
+      case ThemeType.light:
+        return _buildTheme(
+          brightness: Brightness.light,
+          bg: lightBg,
+          surface: lightSurface,
+          accent: lightAccent,
+          textPrimary: textPrimaryLight,
+          textSecondary: textSecondaryLight,
+          border: lightBorder,
+        );
+      case ThemeType.magenta:
+        return _buildTheme(
+          brightness: Brightness.dark,
+          bg: magentaBg,
+          surface: magentaSurface,
+          accent: magentaAccent,
+          textPrimary: textPrimaryDark,
+          textSecondary: textSecondaryDark,
+          border: magentaBorder,
+        );
+      case ThemeType.dark:
+        return _buildTheme(
+          brightness: Brightness.dark,
+          bg: darkBg,
+          surface: darkSurface,
+          accent: darkAccent,
+          textPrimary: textPrimaryDark,
+          textSecondary: textSecondaryDark,
+          border: darkBorder,
+        );
+    }
+  }
+
+  // --- Compatibility Layer (Fixes lint errors in existing files) ---
+  static const Color bgBase = darkBg;
+  static const Color surface = darkSurface;
+  static const Color surfaceElevated = darkSurfaceElevated;
+  static const Color border = darkBorder;
+  static const Color accent = darkAccent;
+  static const Color textPrimary = textPrimaryDark;
+  static const Color textSecondary = textSecondaryDark;
+  static const Color errorColor = Colors.red;
+  static const Color successColor = Colors.green;
+
+  static ThemeData get darkTheme => getTheme(ThemeType.dark);
+
+  static ThemeData _buildTheme({
+    required Brightness brightness,
+    required Color bg,
+    required Color surface,
+    required Color accent,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color border,
+  }) {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: brightness,
       primaryColor: accent,
-      scaffoldBackgroundColor: bgBase,
-      colorScheme: const ColorScheme.dark(
+      scaffoldBackgroundColor: bg,
+      colorScheme: ColorScheme(
+        brightness: brightness,
         primary: accent,
+        onPrimary: brightness == Brightness.dark ? Colors.black : Colors.white,
         secondary: accent,
+        onSecondary: Colors.white,
+        error: Colors.red,
+        onError: Colors.white,
         surface: surface,
         onSurface: textPrimary,
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: bgBase,
+      appBarTheme: AppBarTheme(
+        backgroundColor: bg,
         elevation: 0,
-        centerTitle: true,
         titleTextStyle: TextStyle(
           color: textPrimary,
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent,
         selectedItemColor: accent,
         unselectedItemColor: textSecondary,
@@ -49,34 +172,25 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,
-        hintStyle: const TextStyle(color: textSecondary, fontSize: 14),
-        labelStyle: const TextStyle(color: textSecondary, fontSize: 14),
+        hintStyle: TextStyle(color: textSecondary, fontSize: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: accent, width: 1),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
+          borderSide: BorderSide(color: accent, width: 1.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: accent,
-          foregroundColor: bgBase,
-          minimumSize: const Size.fromHeight(56),
+          foregroundColor: brightness == Brightness.dark
+              ? Colors.black
+              : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );

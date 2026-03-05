@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/player/player_service.dart';
+import '../../shared/widgets/global_playlist.dart';
 import '../../shared/theme/app_theme.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
@@ -122,74 +123,108 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                   ),
                                 ),
                               if (_isExpanded) const SizedBox(width: 4),
-                              // Album Art
-                              GestureDetector(
-                                onTap: () {
-                                  if (!_isExpanded) {
-                                    setState(() {
-                                      _isExpanded = true;
-                                    });
-                                  } else {
-                                    context.push('/player');
-                                  }
-                                },
-                                child: AnimatedBuilder(
-                                  animation: _rotationController,
-                                  builder: (context, child) {
-                                    return Transform.rotate(
-                                      angle:
-                                          _rotationController.value *
-                                          2 *
-                                          3.1415926,
+                              // Album Art with Progress Ring
+                              StreamBuilder<Duration>(
+                                stream: AudioService.position,
+                                builder: (context, posSnap) {
+                                  final position =
+                                      posSnap.data ?? Duration.zero;
+                                  final duration =
+                                      item.duration ?? Duration.zero;
+                                  final progress = duration.inMilliseconds > 0
+                                      ? position.inMilliseconds /
+                                            duration.inMilliseconds
+                                      : 0.0;
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      if (!_isExpanded) {
+                                        setState(() {
+                                          _isExpanded = true;
+                                        });
+                                      } else {
+                                        context.push('/player');
+                                      }
+                                    },
+                                    child: Stack(
                                       alignment: Alignment.center,
-                                      child: child,
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 56, // Match search button size
-                                    height: 56,
-                                    margin: EdgeInsets.only(
-                                      left: _isExpanded ? 0 : 8,
-                                      right: _isExpanded ? 0 : 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.1),
-                                        width: 1.5,
-                                      ),
-                                      // 仅在折叠态提供一个阴影以增强悬浮感
-                                      boxShadow: !_isExpanded
-                                          ? [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(
-                                                  0.5,
-                                                ),
-                                                blurRadius: 12,
-                                                offset: const Offset(0, 4),
-                                              ),
-                                            ]
-                                          : null,
-                                    ),
-                                    child: ClipOval(
-                                      child: Image.network(
-                                        '${item.artUri}',
-                                        key: ValueKey(item.id),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          color: AppTheme.surfaceElevated,
-                                          child: const Icon(
-                                            Icons.music_note,
-                                            color: AppTheme.accent,
+                                      children: [
+                                        // Progress Ring
+                                        CustomPaint(
+                                          size: const Size(64, 64),
+                                          painter: _CircularProgressPainter(
+                                            progress: progress,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            backgroundColor: Colors.white
+                                                .withOpacity(0.1),
                                           ),
                                         ),
-                                      ),
+                                        AnimatedBuilder(
+                                          animation: _rotationController,
+                                          builder: (context, child) {
+                                            return Transform.rotate(
+                                              angle:
+                                                  _rotationController.value *
+                                                  2 *
+                                                  3.1415926,
+                                              alignment: Alignment.center,
+                                              child: child,
+                                            );
+                                          },
+                                          child: Container(
+                                            width:
+                                                52, // Slightly smaller than progress ring
+                                            height: 52,
+                                            margin: EdgeInsets.only(
+                                              left: _isExpanded ? 0 : 8,
+                                              right: _isExpanded ? 0 : 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              // 仅在折叠态提供一个阴影以增强悬浮感
+                                              boxShadow: !_isExpanded
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: Colors.black
+                                                            .withOpacity(0.5),
+                                                        blurRadius: 12,
+                                                        offset: const Offset(
+                                                          0,
+                                                          4,
+                                                        ),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: ClipOval(
+                                              child: Image.network(
+                                                '${item.artUri}',
+                                                key: ValueKey(item.id),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Container(
+                                                      color: AppTheme
+                                                          .surfaceElevated,
+                                                      child: const Icon(
+                                                        Icons.music_note,
+                                                        color: AppTheme.accent,
+                                                      ),
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
                               ),
                               if (_isExpanded) ...[
-                                const SizedBox(width: 12),
+                                const SizedBox(
+                                  width: 8,
+                                ), // Adjusted from 12 to 8 because of progress ring spacing
                                 // Info
                                 Expanded(
                                   child: GestureDetector(
@@ -232,28 +267,33 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                   child: Container(
                                     width: 44,
                                     height: 44,
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.accent,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
                                       isPlaying
-                                          ? Icons.pause
-                                          : Icons.play_arrow,
-                                      color: AppTheme.bgBase,
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
                                       size: 28,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                // Next
                                 IconButton(
-                                  icon: const Icon(
-                                    Icons.skip_next,
-                                    color: AppTheme.textPrimary,
+                                  icon: Icon(
+                                    Icons.playlist_play_rounded,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                     size: 24,
                                   ),
-                                  onPressed: () => handler.skipToNext(),
+                                  onPressed: () =>
+                                      GlobalPlaylist.show(context, ref),
                                 ),
                                 const SizedBox(width: 8),
                               ],
@@ -270,5 +310,57 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
         );
       },
     );
+  }
+}
+
+class _CircularProgressPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color backgroundColor;
+
+  _CircularProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final strokeWidth = 3.0;
+
+    // Background circle
+    final bgPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius - strokeWidth / 2, bgPaint);
+
+    // Progress arc
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(
+      center: center,
+      radius: radius - strokeWidth / 2,
+    );
+    canvas.drawArc(
+      rect,
+      -3.1415926 / 2,
+      2 * 3.1415926 * progress,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircularProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }
