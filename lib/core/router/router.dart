@@ -12,6 +12,8 @@ import '../../features/tasks/tasks_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/player/player_page.dart';
 import '../../features/library/duplicate_cleaning_page.dart';
+import '../../features/search/search_page.dart';
+import '../../features/search/network_search_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // 注意：不再在这里 ref.watch(authServiceProvider)，否则会导致 GoRouter 实例反复重建
@@ -45,10 +47,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/discovery',
             builder: (context, state) => const DiscoveryPage(),
           ),
-          GoRoute(
-            path: '/settings',
-            builder: (context, state) => const SettingsPage(),
-          ),
         ],
       ),
       GoRoute(path: '/tasks', builder: (context, state) => const TasksPage()),
@@ -73,6 +71,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/library/duplicates',
         builder: (context, state) => const DuplicateCleaningPage(),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchPage(),
+      ),
+      GoRoute(
+        path: '/network-search',
+        builder: (context, state) => const NetworkSearchPage(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
       ),
     ],
   );

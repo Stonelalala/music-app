@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/http/api_client.dart';
 import '../../../shared/models/track.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../../../core/player/player_service.dart';
 import '../../../shared/widgets/modern_toast.dart';
 
 class TrackEditSheet extends ConsumerStatefulWidget {
@@ -93,6 +94,24 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
           );
 
       if (mounted) {
+        // 创建更新后的 Track 对象
+        final updatedTrack = Track(
+          id: widget.track.id,
+          title: _titleCtrl.text.trim(),
+          artist: _artistCtrl.text.trim(),
+          album: _albumCtrl.text.trim(),
+          extension: widget.track.extension,
+          duration: widget.track.duration,
+          size: widget.track.size,
+          scrapeStatus: 1, // 修改后状态通常设为已抓取/成功
+          hasLyrics: _lyricsCtrl.text.trim().isNotEmpty,
+          filepath: widget.track.filepath,
+          relativePath: widget.track.relativePath,
+        );
+        
+        // 通知播放服务更新当前状态
+        ref.read(playerHandlerProvider).refreshTrackMetadata(updatedTrack);
+        
         ModernToast.show(context, '保存成功', icon: Icons.check_circle_outline);
         widget.onSaved?.call();
         Navigator.pop(context);
@@ -113,16 +132,16 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     }
   }
 
+  String _scrapeSource = 'netease';
+
   Future<void> _searchMetadata() async {
     final query = '${_titleCtrl.text} ${_artistCtrl.text}'.trim();
     if (query.isEmpty) return;
 
     setState(() => _isSearching = true);
     try {
-      final res = await ref
-          .read(apiClientProvider)
-          .get<Map<String, dynamic>>(
-            '/api/search-metadata?q=${Uri.encodeComponent(query)}',
+      final res = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+            '/api/search-metadata?q=${Uri.encodeComponent(query)}&source=$_scrapeSource',
           );
 
       if (!mounted) return;
@@ -217,6 +236,9 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                         if (item['album'] != null)
                           _albumCtrl.text = item['album'];
                       });
+                      
+                      // 选中数据后异步抓取歌词
+                      _fetchLyricsForSelection(item);
                     },
                   );
                 },
@@ -279,13 +301,45 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 刮削设置 (Scrape Source)
+                  const Text(
+                    '刮削设置 (选择来源)',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildSourceChip('网易云', 'netease'),
+                      const SizedBox(width: 8),
+                      _buildSourceChip('QQ音乐', 'qq'),
+                      const SizedBox(width: 8),
+                      _buildSourceChip('iTunes', 'itunes'),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
                   _buildTextField('标题', _titleCtrl, isRequired: true),
                   const SizedBox(height: 16),
                   _buildTextField('艺术家', _artistCtrl),
                   const SizedBox(height: 16),
                   _buildTextField('专辑', _albumCtrl),
                   const SizedBox(height: 16),
-                  _buildTextField('歌词 (LRC)', _lyricsCtrl, maxLines: 6),
+                  _buildTextField(
+                    '歌词 (LRC)',
+                    _lyricsCtrl,
+                    maxLines: 6,
+                    suffix: _isFetchingLyrics
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -331,11 +385,74 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     );
   }
 
+  bool _isFetchingLyrics = false;
+
+  Future<void> _fetchLyricsForSelection(Map<String, dynamic> item) async {
+    setState(() => _isFetchingLyrics = true);
+    try {
+      final title = item['title'] ?? '';
+      final artist = item['artist'] ?? '';
+      final id = item['id']?.toString() ?? '';
+      
+      final url = '/api/lyrics/search-web?title=${Uri.encodeComponent(title)}&artist=${Uri.encodeComponent(artist)}&source=$_scrapeSource&id=$id';
+      
+      final res = await ref.read(apiClientProvider).get<Map<String, dynamic>>(url);
+      if (res['success'] == true && res['lyrics'] != null && res['lyrics'].toString().isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _lyricsCtrl.text = res['lyrics'] as String;
+          });
+          ModernToast.show(context, '歌词抓取成功', icon: Icons.lyrics_outlined);
+        }
+      } else {
+        if (mounted) {
+          ModernToast.show(context, '未找到该曲目的歌词', icon: Icons.warning_amber_rounded);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ModernToast.show(context, '歌词抓取失败: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLyrics = false);
+      }
+    }
+  }
+
+  Widget _buildSourceChip(String label, String value) {
+    final isSelected = _scrapeSource == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _scrapeSource = value);
+        }
+      },
+      selectedColor: AppTheme.accent.withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 12,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? AppTheme.accent : AppTheme.border,
+        ),
+      ),
+      showCheckmark: false,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
   Widget _buildTextField(
     String label,
     TextEditingController controller, {
     bool isRequired = false,
     int maxLines = 1,
+    Widget? suffix,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,6 +472,8 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                 ' *',
                 style: TextStyle(color: AppTheme.errorColor, fontSize: 13),
               ),
+            const Spacer(),
+            if (suffix != null) suffix,
           ],
         ),
         const SizedBox(height: 8),

@@ -9,6 +9,9 @@ import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../shared/models/track.dart';
 import '../../shared/widgets/global_playlist.dart';
+import '../library/widgets/track_edit_sheet.dart';
+import '../../core/repositories/track_repository.dart';
+import '../../shared/widgets/modern_toast.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key});
@@ -29,6 +32,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   // 进度条拖动优化：记录本地拖动值
   double? _draggingValue;
+
+  // 记录当前布局信息以便滚动计算
+  double _currentViewportHeight = 0;
+  double _currentItemHeight = 0;
 
   @override
   void initState() {
@@ -103,17 +110,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         setState(() {
           _currentLyricIndex = index;
         });
-        final isSmall = MediaQuery.of(context).size.height < 680;
-        _scrollToCurrentLyric(isSmall ? 30.0 : 34.0);
+        _scrollToCurrentLyric();
       }
     }
   }
 
-  void _scrollToCurrentLyric(double itemHeight) {
-    if (_lyricScrollController.hasClients && _currentLyricIndex != -1) {
+  void _scrollToCurrentLyric() {
+    if (_lyricScrollController.hasClients && 
+        _currentLyricIndex != -1 && 
+        _currentItemHeight > 0) {
+      
+      // 设置 targetScroll 为当前行索引乘以行高
+      // 配合 ListView 的 top padding (itemHeight * 2)，当前行将固定在界面第 3 行
+      final targetScroll = _currentLyricIndex * _currentItemHeight;
+      
       _lyricScrollController.animateTo(
-        _currentLyricIndex * itemHeight,
-        duration: const Duration(milliseconds: 400),
+        targetScroll,
+        duration: const Duration(milliseconds: 600),
         curve: Curves.easeOutCubic,
       );
     }
@@ -151,7 +164,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        toolbarHeight: 72,
+        toolbarHeight: 56, // 缩小高度
         leading: IconButton(
           icon: Icon(
             Icons.keyboard_arrow_down,
@@ -169,35 +182,87 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             ),
             onPressed: () => GlobalPlaylist.show(context, ref),
           ),
+          PopupMenuButton<String>(
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: colorScheme.onSurface,
+              size: 26,
+            ),
+            offset: const Offset(0, 56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            onSelected: (value) async {
+              if (value == 'edit') {
+                final currentTrack = ref.read(playerHandlerProvider).currentTrack;
+                if (currentTrack != null) {
+                  TrackEditSheet.show(context, currentTrack);
+                }
+              } else if (value == 'delete') {
+                _confirmDelete(context);
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_note_rounded,
+                      size: 22,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('歌词信息编辑'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 22,
+                      color: colorScheme.error,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('删除歌曲'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(width: 8),
         ],
         centerTitle: true,
         title: Builder(
           builder: (context) {
             final currentTrack = handler.currentTrack ?? track;
-            return RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: currentTrack.title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  currentTrack.title,
+                  maxLines: 2, // 允许两行
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
                   ),
-                  TextSpan(
-                    text: ' - ${currentTrack.artist}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                      color: colorScheme.primary,
-                    ),
+                ),
+                Text(
+                  currentTrack.artist,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.normal,
+                    color: colorScheme.primary,
                   ),
-                ],
-              ),
+                ),
+              ],
             );
           },
         ),
@@ -205,18 +270,22 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isSmallScreen = constraints.maxHeight < 680;
-            final cdSize = isSmallScreen ? 140.0 : 200.0;
-            final itemHeight = isSmallScreen ? 28.0 : 32.0;
-            final lyricsHeight = itemHeight * 5;
-            final spacingHeight = isSmallScreen ? 4.0 : 12.0;
+            final isSmallScreen = constraints.maxHeight < 750;
+            final cdSize = isSmallScreen ? 140.0 : 180.0;
+            // 适度缩小行高和字体
+            _currentItemHeight = isSmallScreen ? 34.0 : 44.0;
+            final spacingHeight = isSmallScreen ? 8.0 : 16.0;
+            final activeFontSize = isSmallScreen ? 17.0 : 22.0;
 
             return Column(
+              mainAxisAlignment: MainAxisAlignment.start, // 置顶排列，消除顶部大空留
               children: [
+                SizedBox(height: spacingHeight), // 只留一小段间距
                 Expanded(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.start, // 置顶
                     children: [
+                      const Spacer(),
                       // CD Disk with Glow Effect
                       _buildCDDiskPremium(
                         handler.currentTrack ?? track,
@@ -226,17 +295,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         cdSize,
                         colorScheme,
                       ),
-                      SizedBox(height: spacingHeight * 2),
-                      // Lyrics View
+                      const Spacer(),
+                      // Lyrics View - 固定显示7行
                       SizedBox(
-                        height: lyricsHeight,
+                        height: _currentItemHeight * 7,
                         child: _buildLyricViewPremium(
                           colorScheme,
-                          isSmallScreen ? 14.0 : 16.0,
-                          itemHeight,
-                          lyricsHeight,
+                          activeFontSize,
+                          _currentItemHeight,
                         ),
                       ),
+                      const Spacer(flex: 2), // 底部留出更多弹性空间
                     ],
                   ),
                 ),
@@ -386,66 +455,70 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     // 如果正在拖动，使用拖动时的值，否则使用播放器当前进度
                     final currentSeconds = _draggingValue ?? pos.inSeconds.toDouble();
                     
-                    return Column(
-                      children: [
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 4,
-                            thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6, // 增加滑块大小，提升交互感
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Row(
+                        children: [
+                          Text(
+                            _formatDuration(Duration(seconds: currentSeconds.toInt())),
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              fontFeatures: const [FontFeature.tabularFigures()],
                             ),
-                            activeTrackColor: colorScheme.primary,
-                            inactiveTrackColor: colorScheme.onSurface
-                                .withOpacity(0.1),
-                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                           ),
-                          child: Slider(
-                            value: currentSeconds.clamp(
-                              0.0,
-                              dur.inSeconds.toDouble() > 0 ? dur.inSeconds.toDouble() : 1.0,
-                            ),
-                            max: dur.inSeconds.toDouble() > 0
-                                ? dur.inSeconds.toDouble()
-                                : 1.0,
-                            onChangeStart: (v) {
-                              setState(() {
-                                _draggingValue = v;
-                              });
-                            },
-                            onChanged: (v) {
-                              setState(() {
-                                _draggingValue = v;
-                              });
-                            },
-                            onChangeEnd: (v) {
-                              handler.seek(Duration(seconds: v.toInt()));
-                              setState(() {
-                                _draggingValue = null;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _formatDuration(Duration(seconds: currentSeconds.toInt())),
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 11,
+                          Expanded(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
+                                ),
+                                activeTrackColor: colorScheme.primary,
+                                inactiveTrackColor: colorScheme.onSurface.withOpacity(0.1),
+                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                                // 移除 Slider 内部的边距，使其与文字贴合更紧密
+                                trackShape: const RoundedRectSliderTrackShape(),
+                              ),
+                              child: Slider(
+                                value: currentSeconds.clamp(
+                                  0.0,
+                                  dur.inSeconds.toDouble() > 0 ? dur.inSeconds.toDouble() : 1.0,
+                                ),
+                                max: dur.inSeconds.toDouble() > 0
+                                    ? dur.inSeconds.toDouble()
+                                    : 1.0,
+                                onChangeStart: (v) {
+                                  setState(() {
+                                    _draggingValue = v;
+                                  });
+                                },
+                                onChanged: (v) {
+                                  setState(() {
+                                    _draggingValue = v;
+                                  });
+                                },
+                                onChangeEnd: (v) {
+                                  handler.seek(Duration(seconds: v.toInt()));
+                                  setState(() {
+                                    _draggingValue = null;
+                                  });
+                                },
                               ),
                             ),
-                            Text(
-                              _formatDuration(dur),
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 11,
-                              ),
+                          ),
+                          Text(
+                            _formatDuration(dur),
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              fontFeatures: const [FontFeature.tabularFigures()],
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -570,7 +643,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     ColorScheme colorScheme,
     double activeFontSize,
     double itemHeight,
-    double lyricsHeight,
   ) {
     if (_parsedLyrics.isEmpty) {
       return Center(
@@ -584,37 +656,49 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       );
     }
 
-    return ListView.builder(
-      controller: _lyricScrollController,
-      itemCount: _parsedLyrics.length,
-      physics: const NeverScrollableScrollPhysics(), // Prevent conflict with parent scroll
-      padding: EdgeInsets.symmetric(vertical: (lyricsHeight - itemHeight) / 2),
-      itemExtent: itemHeight,
-      itemBuilder: (context, i) {
-        final isCurrent = i == _currentLyricIndex;
-        return AnimatedOpacity(
-          duration: const Duration(milliseconds: 300),
-          opacity: isCurrent ? 1.0 : 0.3,
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 300),
-            style: TextStyle(
-              color: isCurrent
-                  ? colorScheme.onSurface
-                  : colorScheme.onSurfaceVariant,
-              fontSize: isCurrent ? activeFontSize : activeFontSize - 2,
-              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w400,
-            ),
-            textAlign: TextAlign.center,
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                _parsedLyrics[i].text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 更新视察高度以便下一次滚动计算
+        _currentViewportHeight = constraints.maxHeight;
+        
+        return ListView.builder(
+          controller: _lyricScrollController,
+          itemCount: _parsedLyrics.length,
+          physics: const BouncingScrollPhysics(),
+          // top 2行，bottom 4行（总高7行），确保当前行（scroll=index*ih）锁定在界面第3行
+          padding: EdgeInsets.only(
+            top: itemHeight * 2,
+            bottom: itemHeight * 4,
           ),
+          itemExtent: itemHeight,
+          itemBuilder: (context, i) {
+            final isCurrent = i == _currentLyricIndex;
+            return AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: isCurrent ? 1.0 : 0.3,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
+                style: TextStyle(
+                  color: isCurrent
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                  fontSize: isCurrent ? activeFontSize : activeFontSize - 4,
+                  fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w400,
+                  letterSpacing: isCurrent ? 0.5 : 0,
+                ),
+                textAlign: TextAlign.center,
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    _parsedLyrics[i].text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -644,6 +728,53 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
     }
     return lines;
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final track = ref.read(playerHandlerProvider).currentTrack;
+    if (track == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要从服务器永久删除歌曲 "${track.title}" 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('确定删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        // 先停止播放并返回
+        final handler = ref.read(playerHandlerProvider);
+        await handler.stop();
+        
+        if (mounted) {
+          context.pop(); // 退出详情页
+        }
+
+        // 执行后端删除
+        await ref.read(trackRepositoryProvider).deleteTracks([track.id]);
+        
+        if (mounted) {
+          ModernToast.show(context, '歌曲已从服务器删除', icon: Icons.delete_forever);
+        }
+      } catch (e) {
+        if (mounted) {
+          ModernToast.show(context, '删除失败: $e', isError: true);
+        }
+      }
+    }
   }
 
   String _formatDuration(Duration d) {

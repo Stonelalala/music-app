@@ -437,78 +437,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ),
               ],
             ),
-            // Floating Search Button
-            Positioned(
-              right: 16,
-              bottom: 240,
-              child: _buildFloatingSearchBar(context, colorScheme),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFloatingSearchBar(
-    BuildContext context,
-    ColorScheme colorScheme,
-  ) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      width: _isSearching ? MediaQuery.of(context).size.width - 32 : 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: _isSearching
-          ? Row(
-              children: [
-                const SizedBox(width: 16),
-                Icon(Icons.search, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    autofocus: true,
-                    style: TextStyle(color: colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      hintText: '搜索库...',
-                      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                  onPressed: () {
-                    setState(() {
-                      _isSearching = false;
-                      _searchController.clear();
-                    });
-                  },
-                ),
-              ],
-            )
-          : InkWell(
-              borderRadius: BorderRadius.circular(28),
-              onTap: () {
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-              child: Icon(Icons.search, color: colorScheme.primary),
-            ),
-    );
-  }
 
   Widget _buildReturnTile(
     BuildContext context, {
