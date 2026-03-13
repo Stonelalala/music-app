@@ -273,7 +273,7 @@ class DiscoveryPage extends ConsumerWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                             color: Colors.black.withValues(alpha: 0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
@@ -662,7 +662,7 @@ class _GridPopup extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Theme.of(
                             context,
-                           ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                       TextButton.icon(

@@ -101,10 +101,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         _error = '登录失败: $e';
       });
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
         });
+      }
     }
   }
 
@@ -176,7 +177,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   keyboardType: TextInputType.url,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return '请输入服务端地址';
-                    if (!v.trim().startsWith('http')) return '地址须以 http(s) 开�?;
+                    if (!v.trim().startsWith('http')) return '地址须以 http(s) 开头';
                     return null;
                   },
                 ),
@@ -202,7 +203,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   obscureText: _obscure,
                   style: const TextStyle(color: AppTheme.textPrimary),
                   decoration: InputDecoration(
-                    hintText: '•••••••�?,
+                    hintText: '••••••••',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -213,7 +214,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? '请输入密�? : null,
+                  validator: (v) => (v == null || v.isEmpty) ? '请输入密码' : null,
                 ),
 
                 if (_error != null) ...[

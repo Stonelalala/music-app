@@ -17,6 +17,7 @@ import 'cache_service.dart';
 class MusicPlayerHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler, ChangeNotifier {
   static const _historyStorageKey = 'play_history_tracks';
+  static const _sessionStorageKey = 'player_session_state';
   static const _maxHistoryLength = 100;
 
   final AudioPlayer _player = AudioPlayer();
@@ -33,6 +34,16 @@ class MusicPlayerHandler extends BaseAudioHandler
   bool _pendingPlayAfterAuth = false;
   bool _isSyncingExclusiveModes = false;
   _ExclusivePlaybackMode? _lastExclusiveMode;
+  List<_LyricLine> _currentLyrics = [];
+  int _lastLyricIndex = -1;
+  Duration? _pendingRestorePosition;
+  bool _pendingRestoreShouldResume = false;
+  Timer? _sleepTimer;
+  Timer? _sleepTicker;
+  Duration? _sleepRemaining;
+  int _lastPersistedSecond = -1;
+  final StreamController<Duration?> _sleepTimerController =
+      StreamController<Duration?>.broadcast();
 
   MusicPlayerHandler() {
     _initAudioSession();
@@ -48,6 +59,17 @@ class MusicPlayerHandler extends BaseAudioHandler
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         skipToNext();
+      }
+    });
+
+    _player.positionStream.listen(_updateLyricInMetadata);
+    _player.positionStream.listen((position) {
+      final wholeSecond = position.inSeconds;
+      if (wholeSecond >= 0 && wholeSecond != _lastPersistedSecond) {
+        _lastPersistedSecond = wholeSecond;
+        if (wholeSecond == 0 || wholeSecond % 5 == 0) {
+          unawaited(_persistSession());
+        }
       }
     });
   }
@@ -70,6 +92,17 @@ class MusicPlayerHandler extends BaseAudioHandler
       debugPrint('Auth received, retrying pending playback...');
       _pendingPlayAfterAuth = false;
       _playCurrentTrack();
+    }
+
+    if (_queue.isNotEmpty && (_pendingRestorePosition != null || _player.audioSource == null)) {
+      unawaited(
+        _playCurrentTrack(
+          autoPlay: _pendingRestoreShouldResume,
+          recordHistory: false,
+          recordPlayback: false,
+          initialPosition: _pendingRestorePosition,
+        ),
+      );
     }
   }
 
@@ -95,6 +128,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _history
       ..clear()
       ..addAll(restored.take(_maxHistoryLength));
+    await _restoreSession();
     notifyListeners();
   }
 
@@ -107,6 +141,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   int get currentIndex => _currentIndex;
 
   AudioPlayer get player => _player;
+  Stream<Duration?> get sleepTimerStream => _sleepTimerController.stream;
+  Duration? get sleepTimerRemaining => _sleepRemaining;
 
   Future<void> loadQueue(List<Track> tracks, {int startIndex = 0}) async {
     _queue = tracks;
@@ -160,17 +196,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
 
     if (currentTrack?.id == updatedTrack.id) {
-      final currentItem = mediaItem.value;
-      if (currentItem != null) {
-        mediaItem.add(
-          currentItem.copyWith(
-            title: updatedTrack.title,
-            artist: updatedTrack.artist,
-            album: updatedTrack.album,
-            duration: Duration(seconds: updatedTrack.duration.toInt()),
-          ),
-        );
-      }
+      _updateMediaItemWithLyric(
+        _lastLyricIndex != -1 && _currentLyrics.isNotEmpty
+            ? _currentLyrics[_lastLyricIndex].text
+            : updatedTrack.artist,
+      );
     }
 
     notifyListeners();
@@ -217,7 +247,83 @@ class MusicPlayerHandler extends BaseAudioHandler
     await prefs.setStringList(_historyStorageKey, encoded);
   }
 
-  Future<void> _playCurrentTrack() async {
+  Future<void> _restoreSession() async {
+    final prefs = _prefs;
+    if (prefs == null) {
+      return;
+    }
+
+    final raw = prefs.getString(_sessionStorageKey);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final queueJson = data['queue'] as List<dynamic>? ?? const [];
+      final restoredQueue = queueJson
+          .map((item) => Track.fromJson(item as Map<String, dynamic>))
+          .toList();
+      if (restoredQueue.isEmpty) {
+        return;
+      }
+
+      _queue = restoredQueue;
+      _currentIndex = ((data['currentIndex'] as num?)?.toInt() ?? 0)
+          .clamp(0, restoredQueue.length - 1);
+      _pendingRestorePosition = Duration(
+        milliseconds: (data['positionMs'] as num?)?.toInt() ?? 0,
+      );
+      _pendingRestoreShouldResume = data['shouldResume'] as bool? ?? false;
+
+      final shuffleEnabled = data['shuffleEnabled'] as bool? ?? false;
+      final loopModeValue = data['loopMode'] as String? ?? 'off';
+      final loopMode = switch (loopModeValue) {
+        'one' => LoopMode.one,
+        'all' => LoopMode.all,
+        _ => LoopMode.off,
+      };
+
+      await _player.setShuffleModeEnabled(shuffleEnabled);
+      await _player.setLoopMode(loopMode);
+      _rebuildPlayOrder(startIndex: _currentIndex);
+    } catch (e) {
+      debugPrint('Failed to restore playback session: $e');
+    }
+  }
+
+  Future<void> _persistSession() async {
+    final prefs = _prefs;
+    if (prefs == null) {
+      return;
+    }
+
+    if (_queue.isEmpty) {
+      await prefs.remove(_sessionStorageKey);
+      return;
+    }
+
+    final payload = {
+      'queue': _queue.map((track) => track.toJson()).toList(growable: false),
+      'currentIndex': _currentIndex,
+      'positionMs': _player.position.inMilliseconds,
+      'shouldResume': _player.playing,
+      'shuffleEnabled': _player.shuffleModeEnabled,
+      'loopMode': switch (_player.loopMode) {
+        LoopMode.one => 'one',
+        LoopMode.all => 'all',
+        LoopMode.off => 'off',
+      },
+    };
+    await prefs.setString(_sessionStorageKey, jsonEncode(payload));
+  }
+
+  Future<void> _playCurrentTrack({
+    bool autoPlay = true,
+    bool recordHistory = true,
+    bool recordPlayback = true,
+    Duration? initialPosition,
+  }) async {
     final track = currentTrack;
     if (track == null) return;
 
@@ -238,6 +344,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       artUri: Uri.parse('$_baseUrl/api/tracks/${track.id}/cover?auth=$_token'),
     );
     mediaItem.add(item);
+    _currentLyrics = [];
+    _lastLyricIndex = -1;
+    unawaited(_fetchAndParseLyrics(track.id));
 
     try {
       final networkUri = Uri.parse(
@@ -269,25 +378,55 @@ class MusicPlayerHandler extends BaseAudioHandler
         }
       }
 
-      _addToHistory(track);
+      if (initialPosition != null && initialPosition > Duration.zero) {
+        await _player.seek(initialPosition);
+      }
+
+      if (recordHistory) {
+        _addToHistory(track);
+      }
+      if (recordPlayback) {
+        unawaited(_recordPlayback(track.id));
+      }
       notifyListeners();
-      await _player.play();
+      if (autoPlay) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+      _pendingRestorePosition = null;
+      _pendingRestoreShouldResume = false;
+      await _persistSession();
     } catch (e) {
       debugPrint('SetAudioSource error: $e');
     }
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    await _player.play();
+    await _persistSession();
+  }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    await _player.pause();
+    await _persistSession();
+  }
 
   @override
-  Future<void> stop() => _player.stop();
+  Future<void> stop() async {
+    _currentLyrics = [];
+    _lastLyricIndex = -1;
+    await _player.stop();
+    await _persistSession();
+  }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+    await _persistSession();
+  }
 
   @override
   Future<void> skipToNext() async {
@@ -402,6 +541,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     _rebuildPlayOrder(startIndex: _currentIndex);
     notifyListeners();
+    await _persistSession();
   }
 
   Future<void> toggleLoopMode() async {
@@ -423,6 +563,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     _rebuildPlayOrder(startIndex: _currentIndex);
     notifyListeners();
+    await _persistSession();
   }
 
   @override
@@ -442,6 +583,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     _rebuildPlayOrder(startIndex: _currentIndex);
     notifyListeners();
+    await _persistSession();
   }
 
   @override
@@ -462,6 +604,46 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _player.setLoopMode(loopMode);
     _rebuildPlayOrder(startIndex: _currentIndex);
     notifyListeners();
+    await _persistSession();
+  }
+
+  void startSleepTimer(Duration duration) {
+    cancelSleepTimer();
+    _sleepRemaining = duration;
+    _sleepTimerController.add(_sleepRemaining);
+    notifyListeners();
+
+    _sleepTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final remaining = _sleepRemaining;
+      if (remaining == null) {
+        timer.cancel();
+        return;
+      }
+
+      final next = remaining - const Duration(seconds: 1);
+      if (next <= Duration.zero) {
+        _sleepRemaining = Duration.zero;
+      } else {
+        _sleepRemaining = next;
+      }
+      _sleepTimerController.add(_sleepRemaining);
+      notifyListeners();
+    });
+
+    _sleepTimer = Timer(duration, () async {
+      cancelSleepTimer();
+      await pause();
+    });
+  }
+
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTicker?.cancel();
+    _sleepTimer = null;
+    _sleepTicker = null;
+    _sleepRemaining = null;
+    _sleepTimerController.add(null);
+    notifyListeners();
   }
 
   Future<String?> getLyrics(String trackId) async {
@@ -476,6 +658,109 @@ class MusicPlayerHandler extends BaseAudioHandler
       debugPrint('Lyrics fetch error: $e');
     }
     return null;
+  }
+
+  Future<void> _fetchAndParseLyrics(String trackId) async {
+    final lyrics = await getLyrics(trackId);
+    if (lyrics != null) {
+      _currentLyrics = _parseLrc(lyrics);
+      _updateLyricInMetadata(_player.position);
+    }
+  }
+
+  void _updateLyricInMetadata(Duration pos) {
+    final item = mediaItem.value;
+    if (item == null) return;
+
+    if (_currentLyrics.isEmpty) {
+      if (item.displaySubtitle != item.artist) {
+        _updateMediaItemWithLyric(item.artist);
+      }
+      return;
+    }
+
+    int index = -1;
+    for (int i = 0; i < _currentLyrics.length; i++) {
+      if (pos >= _currentLyrics[i].time) {
+        index = i;
+      } else {
+        break;
+      }
+    }
+
+    if (index != _lastLyricIndex) {
+      _lastLyricIndex = index;
+      final lyricText = index != -1 ? _currentLyrics[index].text : item.artist;
+      _updateMediaItemWithLyric(lyricText);
+    }
+  }
+
+  void _updateMediaItemWithLyric(String? lyric) {
+    final item = mediaItem.value;
+    final track = currentTrack;
+    if (item == null || track == null) return;
+
+    final displayArtist = lyric ?? track.artist;
+    if (item.artist == displayArtist && item.displaySubtitle == lyric) {
+      return;
+    }
+
+    mediaItem.add(
+      MediaItem(
+        id: track.id,
+        title: track.title,
+        artist: displayArtist,
+        album: track.album,
+        duration: Duration(seconds: track.duration.toInt()),
+        artUri: item.artUri,
+        displayTitle: track.title,
+        displaySubtitle: lyric,
+        displayDescription: lyric,
+        extras: {
+          'lyric': lyric,
+          'android.media.metadata.LYRIC': lyric,
+          'real_artist': track.artist,
+        },
+      ),
+    );
+  }
+
+  List<_LyricLine> _parseLrc(String lrc) {
+    final lines = <_LyricLine>[];
+    final reg = RegExp(r'\[(\d+):(\d+\.?\d*)\](.*)');
+    for (final line in lrc.split('\n')) {
+      final match = reg.firstMatch(line);
+      if (match != null) {
+        final min = int.parse(match.group(1)!);
+        final sec = double.parse(match.group(2)!);
+        final text = match.group(3)!.trim();
+        if (text.isNotEmpty) {
+          lines.add(
+            _LyricLine(
+              time: Duration(
+                milliseconds: (min * 60 * 1000 + sec * 1000).toInt(),
+              ),
+              text: text,
+            ),
+          );
+        }
+      } else if (line.trim().isNotEmpty && !line.startsWith('[')) {
+        lines.add(_LyricLine(time: Duration.zero, text: line.trim()));
+      }
+    }
+    return lines;
+  }
+
+  Future<void> _recordPlayback(String trackId) async {
+    if (_baseUrl == null || _token == null) return;
+    try {
+      await Dio().post(
+        '$_baseUrl/api/tracks/$trackId/play',
+        options: Options(headers: {'Authorization': 'Bearer $_token'}),
+      );
+    } catch (e) {
+      debugPrint('Error recording playback: $e');
+    }
   }
 
   void _broadcastState(dynamic _) {
@@ -526,3 +811,10 @@ final playerHandlerProvider = ChangeNotifierProvider<MusicPlayerHandler>(
 );
 
 enum _ExclusivePlaybackMode { shuffle, singleLoop }
+
+class _LyricLine {
+  final Duration time;
+  final String text;
+
+  _LyricLine({required this.time, required this.text});
+}

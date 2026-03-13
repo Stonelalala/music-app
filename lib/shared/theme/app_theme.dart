@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-enum ThemeType { dark, light, magenta }
+enum ThemeType { system, dark, light, magenta }
 
 class ThemeService extends StateNotifier<ThemeType> {
   static const _kTheme = 'app_theme_type_v2';
   static final _storage = FlutterSecureStorage();
 
-  ThemeService() : super(ThemeType.dark) {
+  ThemeService() : super(ThemeType.system) {
     loadTheme();
   }
 
@@ -18,7 +18,7 @@ class ThemeService extends StateNotifier<ThemeType> {
       if (saved != null) {
         state = ThemeType.values.firstWhere(
           (e) => e.name == saved,
-          orElse: () => ThemeType.dark,
+          orElse: () => ThemeType.system,
         );
       }
     } catch (e) {
@@ -46,6 +46,7 @@ class ThemeInfo {
 
 class AppTheme {
   static List<ThemeInfo> get allThemes => [
+    ThemeInfo(ThemeType.system, '跟随系统', darkAccent),
     ThemeInfo(ThemeType.dark, '经典深色', darkAccent),
     ThemeInfo(ThemeType.light, '明亮模式', lightAccent),
     ThemeInfo(ThemeType.magenta, '极客品红', magentaAccent),
@@ -80,6 +81,16 @@ class AppTheme {
 
   static ThemeData getTheme(ThemeType type) {
     switch (type) {
+      case ThemeType.system:
+        return _buildTheme(
+          brightness: Brightness.dark,
+          bg: darkBg,
+          surface: darkSurface,
+          accent: darkAccent,
+          textPrimary: textPrimaryDark,
+          textSecondary: textSecondaryDark,
+          border: darkBorder,
+        );
       case ThemeType.light:
         return _buildTheme(
           brightness: Brightness.light,

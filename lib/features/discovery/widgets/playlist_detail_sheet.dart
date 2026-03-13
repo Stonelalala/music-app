@@ -233,7 +233,8 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerHighest.withValues(
-                                alpha: 0.3,
+                                alpha:
+                                0.3,
                               ),
                               borderRadius: BorderRadius.circular(16),
                             ),

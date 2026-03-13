@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../core/repositories/track_repository.dart';
 import '../../shared/models/track.dart';
+import '../../shared/widgets/track_action_sheet.dart';
 import 'widgets/track_edit_sheet.dart';
 import 'widgets/library_tools_sheet.dart';
 
@@ -22,7 +24,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   String _activeTab = '歌曲';
   String? _selectedFolder;
 
-  bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -85,7 +86,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? colorScheme.primaryContainer
-                                              .withValues(alpha: 0.3)
+                                          .withValues(alpha: 0.3)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
@@ -221,7 +222,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       _searchController.clear();
                                       setState(() {
                                         _filterArtist = artist;
-                                        _isSearching = false;
                                       });
                                     },
                                     child: _buildGridCard(
@@ -299,7 +299,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                       _searchController.clear();
                                       setState(() {
                                         _filterAlbum = album;
-                                        _isSearching = false;
                                       });
                                     },
                                     child: _buildGridCard(
@@ -436,78 +435,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ),
               ],
             ),
-            // Floating Search Button
-            Positioned(
-              right: 16,
-              bottom: 240,
-              child: _buildFloatingSearchBar(context, colorScheme),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFloatingSearchBar(
-    BuildContext context,
-    ColorScheme colorScheme,
-  ) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      width: _isSearching ? MediaQuery.of(context).size.width - 32 : 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: _isSearching
-          ? Row(
-              children: [
-                const SizedBox(width: 16),
-                Icon(Icons.search, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    autofocus: true,
-                    style: TextStyle(color: colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      hintText: '搜索库...',
-                      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                  onPressed: () {
-                    setState(() {
-                      _isSearching = false;
-                      _searchController.clear();
-                    });
-                  },
-                ),
-              ],
-            )
-          : InkWell(
-              borderRadius: BorderRadius.circular(28),
-              onTap: () {
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-              child: Icon(Icons.search, color: colorScheme.primary),
-            ),
-    );
-  }
 
   Widget _buildReturnTile(
     BuildContext context, {
@@ -547,7 +480,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           Image.network(
             imageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, error, stackTrace) => Container(
+            errorBuilder: (context, error, stackTrace) => Container(
               color: colorScheme.surface,
               child: Icon(
                 Icons.music_note,
@@ -637,16 +570,20 @@ class _TrackTile extends ConsumerWidget {
         onTap: () => ref
             .read(playerHandlerProvider)
             .loadQueue(allTracks, startIndex: index),
+        onLongPress: () => TrackActionSheet.show(context, ref, track),
+        borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
+              child: CachedNetworkImage(
+                imageUrl:
+                    '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
+                cacheKey: 'cover_${track.id}',
                 width: 52,
                 height: 52,
                 fit: BoxFit.cover,
-                errorBuilder: (_, error, stackTrace) => Container(
+                errorWidget: (context, url, error) => Container(
                   width: 52,
                   height: 52,
                   color: colorScheme.surfaceContainerHighest,

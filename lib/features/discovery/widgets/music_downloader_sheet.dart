@@ -200,7 +200,7 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, error, stackTrace) => Container(
+                    errorBuilder: (context, error, stackTrace) => Container(
                       width: 80,
                       height: 80,
                       color: AppTheme.surface,

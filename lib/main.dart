@@ -92,10 +92,19 @@ class _MusicAppState extends ConsumerState<MusicApp> {
 
     final router = ref.watch(routerProvider);
     final themeType = ref.watch(themeTypeProvider);
+    final themeMode = switch (themeType) {
+      ThemeType.system => ThemeMode.system,
+      ThemeType.light => ThemeMode.light,
+      _ => ThemeMode.dark,
+    };
 
     return MaterialApp.router(
       title: '石头音乐',
-      theme: AppTheme.getTheme(themeType),
+      theme: AppTheme.getTheme(ThemeType.light),
+      darkTheme: AppTheme.getTheme(
+        themeType == ThemeType.magenta ? ThemeType.magenta : ThemeType.dark,
+      ),
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

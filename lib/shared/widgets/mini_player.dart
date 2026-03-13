@@ -1,12 +1,11 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import 'package:music/shared/widgets/playlist_sheet.dart';
-
 import '../../core/player/player_service.dart';
+import '../../shared/widgets/global_playlist.dart';
 import '../../shared/theme/app_theme.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
@@ -58,244 +57,202 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
 
             return Align(
               alignment: Alignment.centerRight,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-                height: 72,
-                width: _isExpanded ? MediaQuery.of(context).size.width : 72,
-                margin: EdgeInsets.fromLTRB(
-                  _isExpanded ? 12 : 0,
-                  0,
-                  _isExpanded ? 12 : 8, // Add some right margin when collapsed
-                  12,
-                ),
-                child: Stack(
-                  children: [
-                    // 姣涚幓鐠冭儗鏅眰锛屼粎鍦ㄨ兌鍥婂尯鍩熸湁鏁?
-                    if (_isExpanded)
+              child: GestureDetector(
+                onHorizontalDragEnd: (details) {
+                  // 手势识别：向右划收缩，向左划展开
+                  if (details.primaryVelocity != null) {
+                    if (details.primaryVelocity! > 200) {
+                      // 向右划
+                      if (_isExpanded) setState(() => _isExpanded = false);
+                    } else if (details.primaryVelocity! < -200) {
+                      // 向左划
+                      if (!_isExpanded) setState(() => _isExpanded = true);
+                    }
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  height: 56,
+                  width: _isExpanded ? MediaQuery.of(context).size.width - 72 : 148,
+                  margin: const EdgeInsets.fromLTRB(36, 0, 36, 16),
+                  child: Stack(
+                    children: [
+                      // 毛玻璃背景层
                       Positioned.fill(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.horizontal(
-                            left: const Radius.circular(40),
-                            right: Radius.circular(_isExpanded ? 40 : 0),
-                          ),
+                          borderRadius: BorderRadius.circular(40),
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                             child: const SizedBox.expand(),
                           ),
                         ),
                       ),
-                    // 鍓嶆櫙鍐呭鍖?
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _isExpanded
-                            ? const Color(0xFF1E1E1E).withValues(alpha: 0.4)
-                            : Colors
-                                  .transparent, // True floating when collapsed
-                        borderRadius: BorderRadius.horizontal(
-                          left: const Radius.circular(40),
-                          right: Radius.circular(_isExpanded ? 40 : 0),
+                      // 前景内容区
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(40),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            width: 1,
+                          ),
                         ),
-                        border: _isExpanded
-                            ? Border.all(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                width: 1,
-                              )
-                            : null,
-                      ),
-                      child: SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        scrollDirection: Axis.horizontal,
-                        child: SizedBox(
-                          width: _isExpanded
-                              ? MediaQuery.of(context).size.width - 24
-                              : 72,
-                          child: Row(
-                            children: [
-                              if (_isExpanded)
-                                SizedBox(
-                                  width: 24, // Even narrower
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(), // Critical to remove default constraints
-                                    onPressed: () {
-                                      setState(() {
-                                        _isExpanded = false;
-                                      });
-                                    },
-                                    icon: const Icon(
-                                      Icons.chevron_right,
-                                      color: AppTheme.textSecondary,
-                                      size: 18, // Slightly smaller
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: _isExpanded
+                                ? MediaQuery.of(context).size.width - 72
+                                : 148,
+                            child: Row(
+                              children: [
+                                if (_isExpanded)
+                                  SizedBox(
+                                    width: 24,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isExpanded = false;
+                                        });
+                                      },
+                                      icon: const Icon(
+                                        Icons.chevron_right,
+                                        color: AppTheme.textSecondary,
+                                        size: 18,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              if (_isExpanded) const SizedBox(width: 4), // Tiny gap to CD
-                              if (!_isExpanded) const SizedBox(width: 4), // Center the 64px ring in 72px container
-                              // Album Art with Progress Ring
-                              StreamBuilder<Duration>(
-                                stream: AudioService.position,
-                                builder: (context, posSnap) {
-                                  final position =
-                                      posSnap.data ?? Duration.zero;
-                                  final duration =
-                                      item.duration ?? Duration.zero;
-                                  final progress = duration.inMilliseconds > 0
-                                      ? position.inMilliseconds /
-                                            duration.inMilliseconds
-                                      : 0.0;
-
-                                  return GestureDetector(
-                                    onTap: () {
-                                      if (!_isExpanded) {
-                                        setState(() {
-                                          _isExpanded = true;
-                                        });
-                                      } else {
-                                        context.push('/player');
-                                      }
-                                    },
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // Progress Ring
-                                        CustomPaint(
-                                          size: const Size(64, 64),
-                                          painter: _CircularProgressPainter(
-                                            progress: progress,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            backgroundColor: Colors.white
-                                                .withValues(alpha: 0.1),
-                                          ),
-                                        ),
-                                        AnimatedBuilder(
-                                          animation: _rotationController,
-                                          builder: (context, child) {
-                                            return Transform.rotate(
-                                              angle:
-                                                  _rotationController.value *
-                                                  2 *
-                                                  3.1415926,
-                                              alignment: Alignment.center,
-                                              child: child,
-                                            );
-                                          },
-                                          child: Container(
-                                            width:
-                                                52, // Slightly smaller than progress ring
-                                            height: 52,
-
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              // 浠呭湪鎶樺彔鎬佹彁渚涗竴涓槾褰变互澧炲己鎮诞鎰?
-                                              boxShadow: !_isExpanded
-                                                  ? [
-                                                      BoxShadow(
-                                                        color: Colors.black
-                                                            .withValues(alpha: 0.5),
-                                                        blurRadius: 12,
-                                                        offset: const Offset(
-                                                          0,
-                                                          4,
-                                                        ),
-                                                      ),
-                                                    ]
-                                                  : null,
+                                if (_isExpanded) const SizedBox(width: 4),
+                                // Album Art with Progress Ring
+                                StreamBuilder<Duration>(
+                                  stream: AudioService.position,
+                                  builder: (context, posSnap) {
+                                    final position = posSnap.data ?? Duration.zero;
+                                    final duration = item.duration ?? Duration.zero;
+                                    final progress = duration.inMilliseconds > 0
+                                        ? position.inMilliseconds / duration.inMilliseconds
+                                        : 0.0;
+  
+                                    return GestureDetector(
+                                      onTap: () {
+                                        if (!_isExpanded) {
+                                          setState(() {
+                                            _isExpanded = true;
+                                          });
+                                        } else {
+                                          context.push('/player');
+                                        }
+                                      },
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // Progress Ring
+                                          CustomPaint(
+                                            size: const Size(56, 56),
+                                            painter: _CircularProgressPainter(
+                                              progress: progress,
+                                              color: Theme.of(context).colorScheme.primary,
+                                              backgroundColor: Colors.white.withValues(alpha: 0.1),
                                             ),
-                                            child: ClipOval(
-                                              child: Image.network(
-                                                '${item.artUri}',
-                                                key: ValueKey(item.id),
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (
-                                                  _,
-                                                  error,
-                                                  stackTrace,
-                                                ) =>
-                                                    Container(
-                                                      color: AppTheme
-                                                          .surfaceElevated,
-                                                      child: const Icon(
-                                                        Icons.music_note,
-                                                        color: AppTheme.accent,
-                                                      ),
+                                          ),
+                                          AnimatedBuilder(
+                                            animation: _rotationController,
+                                            builder: (context, child) {
+                                              return Transform.rotate(
+                                                angle: _rotationController.value * 2 * 3.1415926,
+                                                alignment: Alignment.center,
+                                                child: child,
+                                              );
+                                            },
+                                            child: Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: ClipOval(
+                                                child: CachedNetworkImage(
+                                                  imageUrl: '${item.artUri}',
+                                                  cacheKey: 'cover_${item.id}',
+                                                  key: ValueKey(item.id),
+                                                  fit: BoxFit.cover,
+                                                  errorWidget: (context, url, error) => Container(
+                                                    color: AppTheme.surfaceElevated,
+                                                    child: const Icon(
+                                                      Icons.music_note,
+                                                      color: AppTheme.accent,
                                                     ),
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                              if (_isExpanded) ...[
-                                const SizedBox(
-                                  width: 8,
-                                ), // Adjusted from 12 to 8 because of progress ring spacing
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(width: 8),
                                 // Info
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => context.push('/player'),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.title,
-                                          style: const TextStyle(
-                                            color: AppTheme.textPrimary,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                if (_isExpanded)
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => context.push('/player'),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
                                           Text(
-                                            '${item.artist} 鈥?${item.album}',
+                                            item.title,
                                             style: const TextStyle(
-                                              color: AppTheme.textSecondary,
-                                              fontSize: 10, // Slightly smaller
+                                              color: AppTheme.textPrimary,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            item.artist ?? '',
+                                            style: TextStyle(
+                                              color: AppTheme.textSecondary.withValues(alpha: 0.9),
+                                              fontSize: 11,
+                                              fontStyle: (item.artist?.startsWith('[') ?? false)
+                                                  ? FontStyle.italic
+                                                  : FontStyle.normal,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                                // Controls group with less padding
+                                // Controls group
                                 GestureDetector(
-                                  onTap: () => isPlaying
-                                      ? handler.pause()
-                                      : handler.play(),
+                                  onTap: () => isPlaying ? handler.pause() : handler.play(),
                                   child: Container(
-                                    width: 36, // Smaller
+                                    width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
+                                      color: Theme.of(context).colorScheme.primary,
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isPlaying
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimary,
-                                      size: 22, // Smaller
+                                      isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      size: 22,
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 4),
                                 SizedBox(
-                                  width: 32, // Narrower
+                                  width: 32,
                                   child: IconButton(
                                     padding: EdgeInsets.zero,
                                     onPressed: () => handler.skipToNext(),
@@ -306,29 +263,30 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                     ),
                                   ),
                                 ),
-                                SizedBox(
-                                  width: 32, // Narrower
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    icon: Icon(
-                                      Icons.playlist_play_rounded,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                      size: 22,
+                                if (_isExpanded) ...[
+                                  SizedBox(
+                                    width: 32,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: Icon(
+                                        Icons.playlist_play_rounded,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        size: 22,
+                                      ),
+                                      onPressed: () => GlobalPlaylist.show(context, ref),
                                     ),
-                                    onPressed: () =>
-                                        GlobalPlaylist.show(context, ref),
                                   ),
-                                ),
-                                const SizedBox(width: 6),
+                                  const SizedBox(width: 12),
+                                ],
+                                if (!_isExpanded)
+                                  const SizedBox(width: 12),
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -390,4 +348,3 @@ class _CircularProgressPainter extends CustomPainter {
         oldDelegate.backgroundColor != backgroundColor;
   }
 }
-

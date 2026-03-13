@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/auth/auth_service.dart';
 import '../../core/http/api_client.dart';
+import '../../core/player/cache_service.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/modern_toast.dart';
-import 'package:go_router/go_router.dart';
-import '../settings/settings_provider.dart';
-import '../../core/player/cache_service.dart';
+import 'settings_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -18,12 +19,20 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _neteaseCookieCtrl = TextEditingController();
   final _qqCookieCtrl = TextEditingController();
+  final _cacheSectionKey = GlobalKey();
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadInitialConfig();
+  }
+
+  @override
+  void dispose() {
+    _neteaseCookieCtrl.dispose();
+    _qqCookieCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInitialConfig() async {
@@ -34,28 +43,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           .get<Map<String, dynamic>>('/api/settings/config');
       if (config['success'] == true) {
         final data = config['data'] as Map<String, dynamic>;
-        _neteaseCookieCtrl.text = data['neteaseCookie'] ?? '';
-        _qqCookieCtrl.text = data['qqCookie'] ?? '';
+        _neteaseCookieCtrl.text = data['neteaseCookie'] as String? ?? '';
+        _qqCookieCtrl.text = data['qqCookie'] as String? ?? '';
       }
     } catch (e) {
       debugPrint('Failed to load config: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _saveConfig() async {
     setState(() => _isLoading = true);
     try {
-      await ref
-          .read(apiClientProvider)
-          .post(
-            '/api/settings/config',
-            data: {
-              'neteaseCookie': _neteaseCookieCtrl.text,
-              'qqCookie': _qqCookieCtrl.text,
-            },
-          );
+      await ref.read(apiClientProvider).post(
+        '/api/settings/config',
+        data: {
+          'neteaseCookie': _neteaseCookieCtrl.text,
+          'qqCookie': _qqCookieCtrl.text,
+        },
+      );
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -68,7 +77,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -80,16 +91,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('设置'),
+        title: const Text('我的'),
         centerTitle: false,
         actions: [
           if (_isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.only(right: 16),
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
                 child: SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
@@ -97,15 +108,78 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
         children: [
-          _buildSectionTitle(context, '系统工具'),
+          _buildSectionTitle(context, '快捷入口'),
           const SizedBox(height: 12),
-          _buildToolCard(
+          _buildQuickActionsRow(context),
+          const SizedBox(height: 28),
+          _buildSectionTitle(context, '主题外观'),
+          const SizedBox(height: 12),
+          _buildThemeGrid(context, ref, currentTheme),
+          const SizedBox(height: 28),
+          _buildSectionTitle(context, '离线缓存'),
+          const SizedBox(height: 12),
+          _buildCacheSection(context, ref),
+          const SizedBox(height: 28),
+          _buildSectionTitle(context, '账户信息'),
+          const SizedBox(height: 12),
+          _buildInfoTile(context, '当前用户', auth.username ?? '访客'),
+          _buildInfoTile(context, '服务器地址', auth.baseUrl ?? '未连接'),
+          const SizedBox(height: 28),
+          _buildSectionTitle(context, '元数据与下载'),
+          const SizedBox(height: 12),
+          _buildCookieField(
+            context,
+            '网易云 Cookie',
+            _neteaseCookieCtrl,
+            '用于获取每日推荐与下载',
+          ),
+          const SizedBox(height: 16),
+          _buildCookieField(
+            context,
+            'QQ 音乐 Cookie',
+            _qqCookieCtrl,
+            '用于解析 QQ 音乐链接',
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: _isLoading ? null : _saveConfig,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            child: const Text('保存所有配置'),
+          ),
+          const SizedBox(height: 36),
+          _buildSectionTitle(context, '危险区域'),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => ref.read(authServiceProvider.notifier).logout(),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.error,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text(
+              '退出当前账号',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsRow(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildQuickAction(
             context,
             icon: Icons.search_rounded,
-            title: '扫描音乐库',
-            subtitle: '扫描本地目录并同步到数据库',
+            label: '扫描',
             color: Colors.blue,
             onTap: () async {
               try {
@@ -124,12 +198,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               }
             },
           ),
-          const SizedBox(height: 16),
-          _buildToolCard(
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildQuickAction(
             context,
             icon: Icons.auto_awesome_rounded,
-            title: '启动刮削',
-            subtitle: '全量搜索元数据、歌词与封面',
+            label: '刮削',
             color: Colors.purple,
             onTap: () async {
               try {
@@ -148,72 +223,123 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               }
             },
           ),
-          const SizedBox(height: 16),
-          _buildToolCard(
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildQuickAction(
             context,
             icon: Icons.task_alt_rounded,
-            title: '任务进度与历史',
-            subtitle: '查看当前运行中的任务与过往记录',
+            label: '任务',
             color: Colors.orange,
             onTap: () => context.push('/tasks'),
           ),
-          const SizedBox(height: 32),
-          _buildSectionTitle(context, '界面外观'),
-          const SizedBox(height: 12),
-          ...AppTheme.allThemes
-              .map(
-                (theme) => _buildThemeItem(context, ref, theme, currentTheme),
-              )
-              ,
-          const SizedBox(height: 32),
-          _buildSectionTitle(context, '离线缓存'),
-          const SizedBox(height: 12),
-          _buildCacheSection(context, ref),
-          const SizedBox(height: 32),
-          _buildSectionTitle(context, '账户信息'),
-          _buildInfoTile(context, '当前用户', auth.username ?? '访客'),
-          _buildInfoTile(context, '服务器地址', auth.baseUrl ?? '未连接'),
-          const SizedBox(height: 32),
-          _buildSectionTitle(context, '元数据与下载'),
-          const SizedBox(height: 12),
-          _buildCookieField(
-            context,
-            '网易云 Cookie',
-            _neteaseCookieCtrl,
-            '用于获取每日推荐与下载',
-          ),
-          const SizedBox(height: 16),
-          _buildCookieField(
-            context,
-            'QQ 音乐 Cookie',
-            _qqCookieCtrl,
-            '用于解析 QQ 音乐链接',
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _saveConfig,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, size: 22, color: color),
             ),
-            child: const Text('保存所有配置'),
-          ),
-          const SizedBox(height: 48),
-          _buildSectionTitle(context, '危险区域'),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => ref.read(authServiceProvider.notifier).logout(),
-            style: TextButton.styleFrom(
-              foregroundColor: colorScheme.error,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
-            child: const Text(
-              '退出当前账号',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 100),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildThemeGrid(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeType activeType,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final itemWidth = (MediaQuery.of(context).size.width - 52) / 2;
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: AppTheme.allThemes.map((theme) {
+        final isSelected = theme.type == activeType;
+        return GestureDetector(
+          onTap: () => ref.read(themeTypeProvider.notifier).setTheme(theme.type),
+          child: Container(
+            width: itemWidth.clamp(140.0, 220.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.24)
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant.withValues(alpha: 0.24),
+                width: isSelected ? 1.8 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    theme.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: colorScheme.primary,
+                    size: 18,
+                  ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -222,6 +348,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
+      key: _cacheSectionKey,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
@@ -250,13 +377,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Slider(
             value: settings.maxCacheSizeMB.toDouble(),
             min: 128,
-            max: 4096, // 最大支持 4GB
+            max: 4096,
             divisions: 31,
             label: '${settings.maxCacheSizeMB} MB',
             onChanged: (val) {
-              ref
-                  .read(settingsProvider.notifier)
-                  .setMaxCacheSize(val.round());
+              ref.read(settingsProvider.notifier).setMaxCacheSize(val.round());
             },
           ),
           const Divider(height: 32),
@@ -265,14 +390,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               final cachedAsync = ref.watch(cachedTracksProvider);
               return cachedAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, stackTrace) => Text('加载缓存失败: $e'),
+                error: (e, _) => Text('加载缓存失败: $e'),
                 data: (tracks) {
-                  // 实际上我们需要实时计算文件大小，但这里暂用 tracks 计算或通过 getTotalCacheSize
                   return FutureBuilder<int>(
                     future: ref.read(cacheServiceProvider).getTotalCacheSize(),
                     builder: (context, snapshot) {
                       final totalSize = snapshot.data ?? 0;
-                      final sizeDisplay = (totalSize / (1024 * 1024)).toStringAsFixed(1);
+                      final sizeDisplay = (totalSize / (1024 * 1024))
+                          .toStringAsFixed(1);
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -295,12 +420,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                     onTap: () => _showCachedTracks(context, ref),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: colorScheme.primary.withValues(alpha: 0.1),
+                                        color: colorScheme.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
-                                            color: colorScheme.primary.withValues(alpha: 0.2)),
+                                          color: colorScheme.primary.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                        ),
                                       ),
                                       child: Text(
                                         '查看详情',
@@ -320,13 +452,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             onPressed: () async {
                               await ref.read(cacheServiceProvider).clearAllCache();
                               if (context.mounted) {
-                                ModernToast.show(context, '缓存已清空',
-                                    icon: Icons.delete_outline);
+                                ModernToast.show(
+                                  context,
+                                  '缓存已清空',
+                                  icon: Icons.delete_outline,
+                                );
                               }
                             },
                             icon: const Icon(Icons.delete_sweep_rounded),
                             label: const Text('清理缓存'),
-                            style: TextButton.styleFrom(foregroundColor: colorScheme.error),
+                            style: TextButton.styleFrom(
+                              foregroundColor: colorScheme.error,
+                            ),
                           ),
                         ],
                       );
@@ -341,121 +478,81 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildToolCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
 
-  Widget _buildThemeItem(
-    BuildContext context,
-    WidgetRef ref,
-    ThemeInfo theme,
-    ThemeType activeType,
-  ) {
-    final isSelected = theme.type == activeType;
+  Widget _buildInfoTile(BuildContext context, String label, String value) {
     final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return GestureDetector(
-      onTap: () => ref.read(themeTypeProvider.notifier).setTheme(theme.type),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer.withValues(alpha: 0.2)
-              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.primary
-                : colorScheme.outlineVariant.withValues(alpha: 0.2),
-            width: isSelected ? 2 : 1,
+  Widget _buildCookieField(
+    BuildContext context,
+    String label,
+    TextEditingController controller,
+    String hint,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: 3,
+          minLines: 1,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: theme.primaryColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                theme.name,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            if (isSelected)
-              Icon(Icons.check_circle, color: colorScheme.primary),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -509,8 +606,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   builder: (context, ref, child) {
                     final cachedAsync = ref.watch(cachedTracksProvider);
                     return cachedAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, stackTrace) => Center(child: Text('加载失败: $e')),
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      error: (e, _) => Center(child: Text('加载失败: $e')),
                       data: (tracks) {
                         if (tracks.isEmpty) {
                           return const Center(child: Text('暂无已缓存歌曲'));
@@ -522,28 +621,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           itemBuilder: (context, index) {
                             final track = tracks[index];
                             return ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  '${ref.read(authServiceProvider).baseUrl}/api/tracks/${track.id}/cover?auth=${ref.read(authServiceProvider).token}',
-                                  width: 48,
-                                  height: 48,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, error, stackTrace) => Container(
-                                    color: Theme.of(context).colorScheme.surfaceContainer,
-                                    child: const Icon(Icons.music_note),
-                                  ),
-                                ),
-                              ),
-                              title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(track.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              trailing: Text(
-                                track.sizeText,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              title: Text(track.title),
+                              subtitle: Text(track.artist),
+                              leading: const Icon(Icons.music_note_rounded),
                             );
                           },
                         );
@@ -556,72 +636,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 13,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(BuildContext context, String label, String value) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant)),
-          Text(
-            value,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCookieField(
-    BuildContext context,
-    String label,
-    TextEditingController ctrl,
-    String hint,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
-          ),
-        ),
-        TextField(
-          controller: ctrl,
-          maxLines: 2,
-          decoration: InputDecoration(hintText: hint),
-        ),
-      ],
     );
   }
 }

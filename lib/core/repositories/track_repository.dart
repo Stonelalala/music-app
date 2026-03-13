@@ -24,8 +24,11 @@ class TrackRepository {
     return TracksResponse.fromJson(data['data'] as Map<String, dynamic>);
   }
 
-  Future<List<Track>> getRandomTracks() async {
-    final data = await _api.get<Map<String, dynamic>>('/api/discovery/random');
+  Future<List<Track>> getRandomTracks({int limit = 30}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/api/discovery/random',
+      params: {'limit': limit},
+    );
     final list = data['data'] as List<dynamic>;
     return list.map((e) => Track.fromJson(e)).toList();
   }
