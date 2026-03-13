@@ -174,7 +174,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
             Expanded(
               child: ListView.separated(
                 itemCount: results.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, index) =>
                     const Divider(color: AppTheme.border, height: 1),
                 itemBuilder: (ctx, i) {
                   final item = results[i];
@@ -187,7 +187,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                               width: 40,
                               height: 40,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (_, error, stackTrace) => Container(
                                 width: 40,
                                 height: 40,
                                 color: AppTheme.surface,
@@ -210,12 +210,15 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                     onTap: () {
                       Navigator.pop(ctx);
                       setState(() {
-                        if (item['title'] != null)
+                        if (item['title'] != null) {
                           _titleCtrl.text = item['title'];
-                        if (item['artist'] != null)
+                        }
+                        if (item['artist'] != null) {
                           _artistCtrl.text = item['artist'];
-                        if (item['album'] != null)
+                        }
+                        if (item['album'] != null) {
                           _albumCtrl.text = item['album'];
+                        }
                       });
                     },
                   );

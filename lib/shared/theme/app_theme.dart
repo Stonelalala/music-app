@@ -6,9 +6,7 @@ enum ThemeType { dark, light, magenta }
 
 class ThemeService extends StateNotifier<ThemeType> {
   static const _kTheme = 'app_theme_type_v2';
-  static final _storage = FlutterSecureStorage(
-    aOptions: const AndroidOptions(encryptedSharedPreferences: false),
-  );
+  static final _storage = FlutterSecureStorage();
 
   ThemeService() : super(ThemeType.dark) {
     loadTheme();

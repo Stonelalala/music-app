@@ -1,10 +1,12 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:music/shared/widgets/playlist_sheet.dart';
+
 import '../../core/player/player_service.dart';
-import '../../shared/widgets/global_playlist.dart';
 import '../../shared/theme/app_theme.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
@@ -69,7 +71,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                 ),
                 child: Stack(
                   children: [
-                    // 毛玻璃背景层，仅在胶囊区域有效
+                    // 姣涚幓鐠冭儗鏅眰锛屼粎鍦ㄨ兌鍥婂尯鍩熸湁鏁?
                     if (_isExpanded)
                       Positioned.fill(
                         child: ClipRRect(
@@ -83,11 +85,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                           ),
                         ),
                       ),
-                    // 前景内容区
+                    // 鍓嶆櫙鍐呭鍖?
                     Container(
                       decoration: BoxDecoration(
                         color: _isExpanded
-                            ? const Color(0xFF1E1E1E).withOpacity(0.4)
+                            ? const Color(0xFF1E1E1E).withValues(alpha: 0.4)
                             : Colors
                                   .transparent, // True floating when collapsed
                         borderRadius: BorderRadius.horizontal(
@@ -96,7 +98,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                         ),
                         border: _isExpanded
                             ? Border.all(
-                                color: Colors.white.withOpacity(0.05),
+                                color: Colors.white.withValues(alpha: 0.05),
                                 width: 1,
                               )
                             : null,
@@ -165,7 +167,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                               context,
                                             ).colorScheme.primary,
                                             backgroundColor: Colors.white
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                           ),
                                         ),
                                         AnimatedBuilder(
@@ -187,12 +189,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
 
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              // 仅在折叠态提供一个阴影以增强悬浮感
+                                              // 浠呭湪鎶樺彔鎬佹彁渚涗竴涓槾褰变互澧炲己鎮诞鎰?
                                               boxShadow: !_isExpanded
                                                   ? [
                                                       BoxShadow(
                                                         color: Colors.black
-                                                            .withOpacity(0.5),
+                                                            .withValues(alpha: 0.5),
                                                         blurRadius: 12,
                                                         offset: const Offset(
                                                           0,
@@ -207,7 +209,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                                 '${item.artUri}',
                                                 key: ValueKey(item.id),
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
+                                                errorBuilder: (
+                                                  _,
+                                                  error,
+                                                  stackTrace,
+                                                ) =>
                                                     Container(
                                                       color: AppTheme
                                                           .surfaceElevated,
@@ -251,7 +257,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                           Text(
-                                            '${item.artist} — ${item.album}',
+                                            '${item.artist} 鈥?${item.album}',
                                             style: const TextStyle(
                                               color: AppTheme.textSecondary,
                                               fontSize: 10, // Slightly smaller
@@ -384,3 +390,4 @@ class _CircularProgressPainter extends CustomPainter {
         oldDelegate.backgroundColor != backgroundColor;
   }
 }
+

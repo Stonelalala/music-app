@@ -57,6 +57,9 @@ class _MusicAppState extends ConsumerState<MusicApp> {
     // 仅在初始化时执行一次恢复
     Future.microtask(() async {
       await ref.read(authServiceProvider.notifier).init();
+      await ref
+          .read(playerHandlerProvider)
+          .initHistoryStorage(ref.read(sharedPreferencesProvider));
       
       // 恢复后立即同步给播放器
       final auth = ref.read(authServiceProvider);

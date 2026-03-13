@@ -31,8 +31,9 @@ class _DuplicateCleaningPageState extends ConsumerState<DuplicateCleaningPage> {
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty) return;
 
+    final pageContext = context;
     final confirm = await showDialog<bool>(
-      context: context,
+      context: pageContext,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surfaceElevated,
         title: const Text(
@@ -64,9 +65,10 @@ class _DuplicateCleaningPageState extends ConsumerState<DuplicateCleaningPage> {
           .read(apiClientProvider)
           .post('/api/tracks/delete', data: {'ids': _selectedIds.toList()});
 
+      if (!pageContext.mounted) return;
       if (res['success'] == true) {
         ModernToast.show(
-          context,
+          pageContext,
           '成功清理 ${res['count']} 个项目',
           icon: Icons.cleaning_services_rounded,
         );
@@ -74,7 +76,8 @@ class _DuplicateCleaningPageState extends ConsumerState<DuplicateCleaningPage> {
         ref.invalidate(duplicateTracksProvider);
       }
     } catch (e) {
-      ModernToast.show(context, '清理失败: $e', isError: true);
+      if (!pageContext.mounted) return;
+      ModernToast.show(pageContext, '清理失败: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isDeleting = false);
     }
@@ -115,7 +118,7 @@ class _DuplicateCleaningPageState extends ConsumerState<DuplicateCleaningPage> {
                   Icon(
                     Icons.check_circle_outline_rounded,
                     size: 64,
-                    color: colorScheme.primary.withOpacity(0.5),
+                    color: colorScheme.primary.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -164,9 +167,9 @@ class _DuplicateGroupCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated.withOpacity(0.5),
+        color: AppTheme.surfaceElevated.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.border.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +206,7 @@ class _DuplicateGroupCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
+                    color: colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -285,10 +288,10 @@ class _DuplicateGroupCard extends StatelessWidget {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.1),
+                            color: Colors.amber.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                              color: Colors.amber.withOpacity(0.3),
+                              color: Colors.amber.withValues(alpha: 0.3),
                               width: 0.5,
                             ),
                           ),

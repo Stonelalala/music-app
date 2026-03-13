@@ -161,7 +161,7 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
           ElevatedButton(
             onPressed: _isProcessing ? null : _startOrganize,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accent.withOpacity(0.1),
+              backgroundColor: AppTheme.accent.withValues(alpha: 0.1),
               foregroundColor: AppTheme.accent,
               elevation: 0,
               minimumSize: const Size(double.infinity, 48),
@@ -209,7 +209,7 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.accent.withOpacity(0.1),
+                 color: AppTheme.accent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: AppTheme.accent),
@@ -259,7 +259,7 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
       selected: isSelected,
       onSelected: onSelected,
       backgroundColor: AppTheme.surface,
-      selectedColor: AppTheme.accent.withOpacity(0.2),
+      selectedColor: AppTheme.accent.withValues(alpha: 0.2),
       checkmarkColor: AppTheme.accent,
       labelStyle: TextStyle(
         color: isSelected ? AppTheme.accent : AppTheme.textSecondary,

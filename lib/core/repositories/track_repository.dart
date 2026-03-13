@@ -8,12 +8,17 @@ class TrackRepository {
   TrackRepository(this._api);
 
   Future<TracksResponse> getTracks({String? folder, int? status}) async {
+    final params = <String, dynamic>{};
+    if (folder != null) {
+      params['folder'] = folder;
+    }
+    if (status != null) {
+      params['status'] = status;
+    }
+
     final data = await _api.get<Map<String, dynamic>>(
       '/api/tracks',
-      params: {
-        if (folder != null) 'folder': folder,
-        if (status != null) 'status': status,
-      },
+      params: params,
     );
     return TracksResponse.fromJson(data['data'] as Map<String, dynamic>);
   }

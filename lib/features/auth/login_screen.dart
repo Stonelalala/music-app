@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../shared/theme/app_theme.dart';
@@ -18,6 +19,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _serverCtrl = TextEditingController(text: 'http://');
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+
   bool _obscure = true;
   bool _loading = false;
   String? _error;
@@ -31,7 +33,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -39,7 +44,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     try {
       final baseUrl = _serverCtrl.text.trim().replaceAll(RegExp(r'/$'), '');
-      debugPrint('Attempting login to: $baseUrl/api/auth/login');
       final dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
@@ -49,36 +53,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       final res = await dio.post(
         '/api/auth/login',
-        data: {'username': _userCtrl.text.trim(), 'password': _passCtrl.text},
+        data: {
+          'username': _userCtrl.text.trim(),
+          'password': _passCtrl.text,
+        },
       );
 
       final token = res.data['token'] as String;
       final username = res.data['user']['username'] as String;
 
-      final auth = ref.read(authServiceProvider.notifier);
-      await auth.saveLogin(token: token, baseUrl: baseUrl, username: username);
+      await ref.read(authServiceProvider.notifier).saveLogin(
+        token: token,
+        baseUrl: baseUrl,
+        username: username,
+      );
 
-      // 更新 PlayerHandler 认证信息
       ref.read(playerHandlerProvider).setAuth(token, baseUrl);
 
-      if (mounted) context.go('/home');
+      if (mounted) {
+        context.go('/home');
+      }
     } on DioException catch (e) {
-      debugPrint('Login DioError: ${e.type} - ${e.message}');
-      debugPrint('Login DioError Response: ${e.response}');
       setState(() {
-        _error =
-            e.response?.data?['error'] as String? ?? '无法连接到服务器 (${e.type})';
+        _error = e.response?.data?['error'] as String? ??
+            'Unable to connect to the server (${e.type})';
       });
     } catch (e) {
-      debugPrint('Login GenericError: $e');
       setState(() {
-        _error = '登录失败: $e';
+        _error = 'Login failed: $e';
       });
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
         });
+      }
     }
   }
 
@@ -87,10 +96,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () {},
-        ),
         title: const Text('Server Setup'),
       ),
       body: SafeArea(
@@ -102,7 +107,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 40),
-                // Logo
                 Center(
                   child: Container(
                     width: 100,
@@ -134,11 +138,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 const Text(
                   'Connect to your private cloud library',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 48),
-
-                // Server URL
                 _buildLabel('SERVER URL'),
                 TextFormField(
                   controller: _serverCtrl,
@@ -149,14 +154,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                   keyboardType: TextInputType.url,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return '请输入服务端地址';
-                    if (!v.trim().startsWith('http')) return '地址须以 http(s) 开�?;
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Please enter the server URL';
+                    }
+                    if (!v.trim().startsWith('http')) {
+                      return 'URL must start with http or https';
+                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 24),
-
-                // Username
                 _buildLabel('USERNAME'),
                 TextFormField(
                   controller: _userCtrl,
@@ -165,18 +172,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     hintText: 'your_username',
                     prefixIcon: Icon(Icons.person_outline, size: 20),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? '请输入用户名' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Please enter your username';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
-
-                // Password
                 _buildLabel('PASSWORD'),
                 TextFormField(
                   controller: _passCtrl,
                   obscureText: _obscure,
                   style: const TextStyle(color: AppTheme.textPrimary),
                   decoration: InputDecoration(
-                    hintText: '•••••••�?,
+                    hintText: 'Enter password',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -184,12 +194,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         size: 20,
                         color: AppTheme.textSecondary,
                       ),
-                      onPressed: () => setState(() => _obscure = !_obscure),
+                      onPressed: () {
+                        setState(() {
+                          _obscure = !_obscure;
+                        });
+                      },
                     ),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? '请输入密�? : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Please enter your password';
+                    }
+                    return null;
+                  },
                 ),
-
                 if (_error != null) ...[
                   const SizedBox(height: 20),
                   Container(
@@ -208,7 +226,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                   ),
                 ],
-
                 const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: _loading ? null : _login,
@@ -222,27 +239,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                         )
                       : const Text('Test Connection'),
-                ),
-                const SizedBox(height: 32),
-                Center(
-                  child: Text.rich(
-                    TextSpan(
-                      text: 'Need help with setup? ',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 14,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'View Documentation',
-                          style: TextStyle(
-                            color: AppTheme.accent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 40),
               ],

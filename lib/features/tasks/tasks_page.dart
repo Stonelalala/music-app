@@ -90,7 +90,7 @@ class TasksPage extends ConsumerWidget {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: tasks.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, index) => const SizedBox(height: 8),
               itemBuilder: (ctx, i) => _TaskCard(task: tasks[i]),
             ),
           );

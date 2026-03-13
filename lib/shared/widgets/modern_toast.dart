@@ -46,19 +46,19 @@ class ModernToast extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
-              color: (isError ? Colors.red : colorScheme.surface).withOpacity(
-                0.7,
+              color: (isError ? Colors.red : colorScheme.surface).withValues(
+                alpha: 0.7,
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: (isError ? Colors.red : colorScheme.primary).withOpacity(
-                  0.2,
+                color: (isError ? Colors.red : colorScheme.primary).withValues(
+                  alpha: 0.2,
                 ),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),

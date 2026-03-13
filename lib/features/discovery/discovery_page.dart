@@ -33,7 +33,7 @@ class DiscoveryPage extends ConsumerWidget {
     String proxyCover(String rawUrl) =>
         '$baseUrl/api/proxy-image?url=${Uri.encodeComponent(rawUrl)}&auth=$token';
 
-    Future<void> _quickDownload(String id, String title) async {
+    Future<void> quickDownload(String id, String title) async {
       try {
         await ref
             .read(trackRepositoryProvider)
@@ -98,7 +98,7 @@ class DiscoveryPage extends ConsumerWidget {
                       context,
                       songs,
                       proxyCover,
-                      _quickDownload,
+                      quickDownload,
                     );
                   },
                 ),
@@ -189,7 +189,7 @@ class DiscoveryPage extends ConsumerWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE91E63).withOpacity(0.4),
+              color: const Color(0xFFE91E63).withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -203,7 +203,7 @@ class DiscoveryPage extends ConsumerWidget {
               child: Icon(
                 Icons.music_note_rounded,
                 size: 150,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
               ),
             ),
             Padding(
@@ -215,9 +215,11 @@ class DiscoveryPage extends ConsumerWidget {
                     width: 70,
                     height: 70,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -259,7 +261,7 @@ class DiscoveryPage extends ConsumerWidget {
                         Text(
                           '基于您的听歌喜好，为您定制的 30 首每日惊喜。',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 12,
                           ),
                           maxLines: 2,
@@ -271,7 +273,7 @@ class DiscoveryPage extends ConsumerWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.2),
+                             color: Colors.black.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
@@ -384,7 +386,10 @@ class DiscoveryPage extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.7)],
+            colors: [
+              colorScheme.primary,
+              colorScheme.primary.withValues(alpha: 0.7),
+            ],
           ),
           borderRadius: BorderRadius.circular(24),
         ),
@@ -455,7 +460,7 @@ class DiscoveryPage extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -468,13 +473,13 @@ class DiscoveryPage extends ConsumerWidget {
               height: 44,
               fit: BoxFit.cover,
               placeholder: (context, url) => Container(
-                color: colorScheme.surfaceVariant,
+                color: colorScheme.surfaceContainerHighest,
                 child: const Center(
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
               errorWidget: (context, url, error) => Container(
-                color: colorScheme.surfaceVariant,
+                color: colorScheme.surfaceContainerHighest,
                 child: const Icon(Icons.music_note, size: 20),
               ),
             ),
@@ -534,7 +539,7 @@ class DiscoveryPage extends ConsumerWidget {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
@@ -612,10 +617,12 @@ class _GridPopup extends StatelessWidget {
         child: Container(
           height: MediaQuery.of(context).size.height * 0.85,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             border: Border.all(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.1),
               width: 0.5,
             ),
           ),
@@ -628,7 +635,7 @@ class _GridPopup extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -655,7 +662,7 @@ class _GridPopup extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.7),
+                           ).colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                       TextButton.icon(
@@ -665,7 +672,7 @@ class _GridPopup extends StatelessWidget {
                         style: TextButton.styleFrom(
                           backgroundColor: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.1),
+                          ).colorScheme.onSurface.withValues(alpha: 0.1),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 8,

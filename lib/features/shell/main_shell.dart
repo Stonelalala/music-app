@@ -22,8 +22,9 @@ class MainShell extends ConsumerWidget {
     if (location.startsWith('/library')) currentIndex = 1;
     if (location.startsWith('/discovery')) currentIndex = 2;
     if (location.startsWith('/settings')) currentIndex = 3;
-    if (location.startsWith('/tasks'))
+    if (location.startsWith('/tasks')) {
       currentIndex = 2; // Tasks map to Discovery tab
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -63,11 +64,11 @@ class MainShell extends ConsumerWidget {
                         child: Container(
                           height: 80,
                           decoration: BoxDecoration(
-                            color: colorScheme.surface.withOpacity(0.6),
+                            color: colorScheme.surface.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(40),
                             border: Border.all(
-                              color: colorScheme.outlineVariant.withOpacity(
-                                0.2,
+                              color: colorScheme.outlineVariant.withValues(
+                                alpha: 0.2,
                               ),
                               width: 1,
                             ),

@@ -203,13 +203,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                             final albumTracks = allTracksData.tracks
                                 .where((t) => t.album == albumName)
                                 .toList();
-                            if (mounted)
-                              _showAlbumDetails(
-                                context,
-                                ref,
-                                albumName,
-                                albumTracks,
-                              );
+                            if (!context.mounted) return;
+                            _showAlbumDetails(
+                              context,
+                              ref,
+                              albumName,
+                              albumTracks,
+                            );
                           },
                         );
                       },
@@ -305,7 +305,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 width: 110,
                 height: 110,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, error, stackTrace) => Container(
                   width: 110,
                   height: 110,
                   color: colorScheme.surfaceContainerHighest,
@@ -357,7 +357,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -417,7 +417,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -496,7 +496,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -585,7 +585,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, error, stackTrace) => Container(
                   width: 48,
                   height: 48,
                   color: colorScheme.surfaceContainerHighest,
@@ -629,7 +629,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.15),
+                            color: colorScheme.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -646,7 +646,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Text(
                         track.sizeText,
                         style: TextStyle(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                           fontSize: 10,
                         ),
                       ),

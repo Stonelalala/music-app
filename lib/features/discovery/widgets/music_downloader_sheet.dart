@@ -200,7 +200,7 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, error, stackTrace) => Container(
                       width: 80,
                       height: 80,
                       color: AppTheme.surface,
@@ -261,7 +261,7 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                     if (val) setState(() => _selectedLevel = lvl['id']!);
                   },
                   backgroundColor: AppTheme.surface,
-                  selectedColor: AppTheme.accent.withOpacity(0.2),
+                  selectedColor: AppTheme.accent.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: isSelected
                         ? AppTheme.accent

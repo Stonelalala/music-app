@@ -1,14 +1,16 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
+
+import 'package:music/shared/widgets/playlist_sheet.dart';
+
 import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../shared/models/track.dart';
-import '../../shared/widgets/global_playlist.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key});
@@ -27,7 +29,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   StreamSubscription? _playingSubscription;
   String? _lastTrackId;
 
-  // 进度条拖动优化：记录本地拖动值
+  // 杩涘害鏉℃嫋鍔ㄤ紭鍖栵細璁板綍鏈湴鎷栧姩鍊?
   double? _draggingValue;
 
   @override
@@ -130,11 +132,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   Widget build(BuildContext context) {
-    // 监听 handler 变化以触发 UI 刷新
+    // 鐩戝惉 handler 鍙樺寲浠ヨЕ鍙?UI 鍒锋柊
     final handler = ref.watch(playerHandlerProvider);
     final auth = ref.watch(authServiceProvider);
     
-    // 每次 build 检查歌曲是否变化（切歌）
+    // 姣忔 build 妫€鏌ユ瓕鏇叉槸鍚﹀彉鍖栵紙鍒囨瓕锛?
     _checkAndFetchLyrics();
     
     final track = handler.currentTrack;
@@ -278,7 +280,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: accentColor.withOpacity(0.2),
+                    color: accentColor.withValues(alpha: 0.2),
                     blurRadius: 60,
                     spreadRadius: 10,
                   ),
@@ -295,7 +297,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   shape: BoxShape.circle,
                   color: Colors.black,
                   border: Border.all(
-                    color: colorScheme.onSurface.withOpacity(0.1),
+                    color: colorScheme.onSurface.withValues(alpha: 0.1),
                     width: 2,
                   ),
                 ),
@@ -323,12 +325,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 shape: BoxShape.circle,
                 color: colorScheme.surface,
                 border: Border.all(
-                  color: colorScheme.onSurface.withOpacity(0.2),
+                  color: colorScheme.onSurface.withValues(alpha: 0.2),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: accentColor.withOpacity(0.5),
+                    color: accentColor.withValues(alpha: 0.5),
                     blurRadius: 10,
                   ),
                 ],
@@ -360,9 +362,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer.withOpacity(0.4),
+        color: colorScheme.surfaceContainer.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
+        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.08)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
@@ -383,7 +385,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     final pos = snap.data ?? Duration.zero;
                     final dur = Duration(seconds: track.duration.toInt());
                     
-                    // 如果正在拖动，使用拖动时的值，否则使用播放器当前进度
+                    // 濡傛灉姝ｅ湪鎷栧姩锛屼娇鐢ㄦ嫋鍔ㄦ椂鐨勫€硷紝鍚﹀垯浣跨敤鎾斁鍣ㄥ綋鍓嶈繘搴?
                     final currentSeconds = _draggingValue ?? pos.inSeconds.toDouble();
                     
                     return Column(
@@ -392,11 +394,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 4,
                             thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6, // 增加滑块大小，提升交互感
+                              enabledThumbRadius: 6, // 澧炲姞婊戝潡澶у皬锛屾彁鍗囦氦浜掓劅
                             ),
                             activeTrackColor: colorScheme.primary,
                             inactiveTrackColor: colorScheme.onSurface
-                                .withOpacity(0.1),
+                                .withValues(alpha: 0.1),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                           ),
                           child: Slider(
@@ -482,14 +484,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         final processingState = playerState?.processingState;
                         final playing = playerState?.playing ?? false;
 
-                        // 是否处于加载或缓冲状态
+                        // 鏄惁澶勪簬鍔犺浇鎴栫紦鍐茬姸鎬?
                         final isLoading = processingState == ProcessingState.buffering ||
                                          processingState == ProcessingState.loading;
 
                         return Stack(
                           alignment: Alignment.center,
                           children: [
-                            // 固定 72x72 的空间，防止加载环出现/消失时 UI 整体发生位移
+                            // 鍥哄畾 72x72 鐨勭┖闂达紝闃叉鍔犺浇鐜嚭鐜?娑堝け鏃?UI 鏁翠綋鍙戠敓浣嶇Щ
                             SizedBox(
                               width: 72,
                               height: 72,
@@ -514,7 +516,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: colorScheme.primary.withOpacity(0.4),
+                                      color: colorScheme.primary.withValues(alpha: 0.4),
                                       blurRadius: 16,
                                     ),
                                   ],
@@ -575,9 +577,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     if (_parsedLyrics.isEmpty) {
       return Center(
         child: Text(
-          '暂无歌词',
+          '鏆傛棤姝岃瘝',
           style: TextStyle(
-            color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             fontSize: 14,
           ),
         ),
@@ -659,3 +661,4 @@ class _LyricLine {
   final String text;
   _LyricLine({required this.time, required this.text});
 }
+

@@ -85,7 +85,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? colorScheme.primaryContainer
-                                              .withOpacity(0.3)
+                                              .withValues(alpha: 0.3)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
@@ -290,7 +290,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                 ),
                                 itemBuilder: (context, i) {
                                   final album = albumList[i].key;
-                                  final count = albumList[i].value.length;
                                   final firstTrack = albumList[i].value.first;
                                   final coverUrl =
                                       '${ref.read(authServiceProvider).baseUrl ?? ''}/api/tracks/${firstTrack.id}/cover?auth=${ref.read(authServiceProvider).token ?? ''}';
@@ -459,11 +458,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       width: _isSearching ? MediaQuery.of(context).size.width - 32 : 56,
       height: 56,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -539,7 +538,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -548,7 +547,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           Image.network(
             imageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (_, error, stackTrace) => Container(
               color: colorScheme.surface,
               child: Icon(
                 Icons.music_note,
@@ -564,8 +563,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.2),
-                  Colors.black.withOpacity(0.8),
+                  Colors.black.withValues(alpha: 0.2),
+                  Colors.black.withValues(alpha: 0.8),
                 ],
                 stops: const [0.4, 0.7, 1.0],
               ),
@@ -593,7 +592,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                   maxLines: 1,
@@ -627,10 +626,10 @@ class _TrackTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.15),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: colorScheme.outlineVariant.withOpacity(0.1),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.1),
           width: 0.5,
         ),
       ),
@@ -647,7 +646,7 @@ class _TrackTile extends ConsumerWidget {
                 width: 52,
                 height: 52,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, error, stackTrace) => Container(
                   width: 52,
                   height: 52,
                   color: colorScheme.surfaceContainerHighest,
@@ -690,7 +689,7 @@ class _TrackTile extends ConsumerWidget {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.15),
+                          color: colorScheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -706,7 +705,7 @@ class _TrackTile extends ConsumerWidget {
                       Text(
                         track.sizeText,
                         style: TextStyle(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                           fontSize: 10,
                         ),
                       ),

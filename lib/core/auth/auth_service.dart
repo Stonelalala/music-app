@@ -32,9 +32,7 @@ class AuthState {
 }
 
 class AuthService extends StateNotifier<AuthState> {
-  static final _storage = FlutterSecureStorage(
-    aOptions: const AndroidOptions(encryptedSharedPreferences: false),
-  );
+  static final _storage = FlutterSecureStorage();
 
   AuthService() : super(const AuthState());
 

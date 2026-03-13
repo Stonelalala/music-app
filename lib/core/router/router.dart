@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:music/features/auth/login_screen.dart';
+import 'package:music/features/discovery/discovery_page.dart';
+import 'package:music/features/home/home_page.dart';
+import 'package:music/features/library/duplicate_cleaning_page.dart';
+import 'package:music/features/library/library_page.dart';
+import 'package:music/features/player/player_page.dart';
+import 'package:music/features/settings/settings_page.dart';
+import 'package:music/features/shell/main_shell.dart';
+import 'package:music/features/tasks/tasks_page.dart';
+
 import '../auth/auth_service.dart';
-import '../../features/auth/login_page.dart';
-import '../../features/home/home_page.dart';
-import '../../features/shell/main_shell.dart';
-import '../../features/library/library_page.dart';
-import '../../features/discovery/discovery_page.dart';
-import '../../features/tasks/tasks_page.dart';
-import '../../features/settings/settings_page.dart';
-import '../../features/player/player_page.dart';
-import '../../features/library/duplicate_cleaning_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // 注意：不再在这里 ref.watch(authServiceProvider)，否则会导致 GoRouter 实例反复重建
@@ -81,6 +82,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 /// 将 Riverpod 状态转换为 GoRouter 可识别的 Listenable
 class _RouterRefreshStream extends ChangeNotifier {
   _RouterRefreshStream(Ref ref) {
-    ref.listen(authServiceProvider, (_, __) => notifyListeners());
+    ref.listen(authServiceProvider, (previous, next) => notifyListeners());
   }
 }

@@ -164,7 +164,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               .map(
                 (theme) => _buildThemeItem(context, ref, theme, currentTheme),
               )
-              .toList(),
+              ,
           const SizedBox(height: 32),
           _buildSectionTitle(context, '离线缓存'),
           const SizedBox(height: 12),
@@ -224,7 +224,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.2),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -261,13 +261,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const Divider(height: 32),
           Consumer(
-            builder: (context, ref, _) {
+            builder: (context, ref, child) {
               final cachedAsync = ref.watch(cachedTracksProvider);
               return cachedAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, __) => Text('加载缓存失败: $e'),
+                error: (e, stackTrace) => Text('加载缓存失败: $e'),
                 data: (tracks) {
-                  final size = tracks.fold<int>(0, (prev, t) => prev + t.size);
                   // 实际上我们需要实时计算文件大小，但这里暂用 tracks 计算或通过 getTotalCacheSize
                   return FutureBuilder<int>(
                     future: ref.read(cacheServiceProvider).getTotalCacheSize(),
@@ -298,10 +297,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: colorScheme.primary.withOpacity(0.1),
+                                        color: colorScheme.primary.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
-                                            color: colorScheme.primary.withOpacity(0.2)),
+                                            color: colorScheme.primary.withValues(alpha: 0.2)),
                                       ),
                                       child: Text(
                                         '查看详情',
@@ -357,10 +356,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: colorScheme.outlineVariant.withOpacity(0.3),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -368,7 +367,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, color: color, size: 28),
@@ -389,7 +388,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                       fontSize: 13,
                     ),
                   ),
@@ -398,7 +397,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -422,13 +421,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? colorScheme.primaryContainer.withOpacity(0.2)
-              : colorScheme.surfaceContainerHighest.withOpacity(0.2),
+              ? colorScheme.primaryContainer.withValues(alpha: 0.2)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? colorScheme.primary
-                : colorScheme.outlineVariant.withOpacity(0.2),
+                : colorScheme.outlineVariant.withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -481,7 +480,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -505,11 +506,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               Expanded(
                 child: Consumer(
-                  builder: (context, ref, _) {
+                  builder: (context, ref, child) {
                     final cachedAsync = ref.watch(cachedTracksProvider);
                     return cachedAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, __) => Center(child: Text('加载失败: $e')),
+                      error: (e, stackTrace) => Center(child: Text('加载失败: $e')),
                       data: (tracks) {
                         if (tracks.isEmpty) {
                           return const Center(child: Text('暂无已缓存歌曲'));
@@ -528,7 +529,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                   width: 48,
                                   height: 48,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
+                                  errorBuilder: (_, error, stackTrace) => Container(
                                     color: Theme.of(context).colorScheme.surfaceContainer,
                                     child: const Icon(Icons.music_note),
                                   ),
@@ -579,7 +580,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.2),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

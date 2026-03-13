@@ -111,10 +111,10 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
         child: Container(
           height: screenHeight * 0.85,
           decoration: BoxDecoration(
-            color: colorScheme.surface.withOpacity(0.7),
+            color: colorScheme.surface.withValues(alpha: 0.7),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             border: Border.all(
-              color: colorScheme.onSurface.withOpacity(0.1),
+              color: colorScheme.onSurface.withValues(alpha: 0.1),
               width: 0.5,
             ),
           ),
@@ -125,7 +125,7 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -142,13 +142,13 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                         height: 100,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
-                          color: colorScheme.surfaceVariant,
+                          color: colorScheme.surfaceContainerHighest,
                           child: const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
                         errorWidget: (context, url, error) => Container(
-                          color: colorScheme.surfaceVariant,
+                          color: colorScheme.surfaceContainerHighest,
                           child: const Icon(Icons.playlist_play, size: 40),
                         ),
                       ),
@@ -192,13 +192,13 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface.withOpacity(0.7),
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     TextButton.icon(
                       onPressed: _isLoading ? null : _downloadAll,
                       style: TextButton.styleFrom(
-                        backgroundColor: colorScheme.onSurface.withOpacity(0.1),
+                        backgroundColor: colorScheme.onSurface.withValues(alpha: 0.1),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
@@ -232,8 +232,8 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceVariant.withOpacity(
-                                0.3,
+                              color: colorScheme.surfaceContainerHighest.withValues(
+                                alpha: 0.3,
                               ),
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -247,7 +247,7 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                                     height: 44,
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) => Container(
-                                      color: colorScheme.surfaceVariant,
+                                      color: colorScheme.surfaceContainerHighest,
                                       child: const Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
@@ -256,7 +256,7 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
                                     ),
                                     errorWidget: (context, url, error) =>
                                         Container(
-                                          color: colorScheme.surfaceVariant,
+                                          color: colorScheme.surfaceContainerHighest,
                                           child: const Icon(
                                             Icons.music_note,
                                             size: 20,
