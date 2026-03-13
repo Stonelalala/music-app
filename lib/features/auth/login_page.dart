@@ -23,6 +23,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // 预填充历史登录信息
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = ref.read(authServiceProvider);
+      if (auth.baseUrl != null) {
+        _serverCtrl.text = auth.baseUrl!;
+      }
+      if (auth.username != null) {
+        _userCtrl.text = auth.username!;
+      }
+      if (auth.password != null) {
+        _passCtrl.text = auth.password!;
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _serverCtrl.dispose();
     _userCtrl.dispose();
@@ -39,6 +57,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     try {
       final baseUrl = _serverCtrl.text.trim().replaceAll(RegExp(r'/$'), '');
+      final username = _userCtrl.text.trim();
+      final password = _passCtrl.text;
+
       debugPrint('Attempting login to: $baseUrl/api/auth/login');
       final dio = Dio(
         BaseOptions(
@@ -49,14 +70,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       final res = await dio.post(
         '/api/auth/login',
-        data: {'username': _userCtrl.text.trim(), 'password': _passCtrl.text},
+        data: {'username': username, 'password': password},
       );
 
       final token = res.data['token'] as String;
-      final username = res.data['user']['username'] as String;
+      final serverUsername = res.data['user']['username'] as String;
 
       final auth = ref.read(authServiceProvider.notifier);
-      await auth.saveLogin(token: token, baseUrl: baseUrl, username: username);
+      await auth.saveLogin(
+        token: token,
+        baseUrl: baseUrl,
+        username: serverUsername,
+        password: password,
+      );
 
       // 更新 PlayerHandler 认证信息
       ref.read(playerHandlerProvider).setAuth(token, baseUrl);

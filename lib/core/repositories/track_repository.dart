@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../http/api_client.dart';
 import '../../shared/models/track.dart';
+import '../../shared/models/network_track.dart';
 
 class TrackRepository {
   final ApiClient _api;
@@ -99,6 +100,44 @@ class TrackRepository {
         'level': level,
       },
     );
+  }
+
+  Future<void> downloadQQMusicSong(String id, String level) async {
+    await _api.post('/api/qq/download', data: {'id': id, 'level': level});
+  }
+
+  Future<void> downloadKugouSong(String id, String level) async {
+    await _api.post('/api/kugou/download', data: {'id': id, 'level': level});
+  }
+
+  Future<void> downloadKuwoSong(String id, String level) async {
+    await _api.post('/api/kuwo/download', data: {'id': id, 'level': level});
+  }
+
+  Future<List<NetworkTrack>> searchNetworkTracks(String query, String source) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/api/search-metadata',
+      params: {'q': query, 'source': source},
+    );
+    final list = data['results'] as List<dynamic>? ?? [];
+    return list.map((e) => NetworkTrack.fromJson(e as Map<String, dynamic>, defaultSource: source)).toList();
+  }
+
+  Future<void> deleteTracks(List<String> ids) async {
+    await _api.post('/api/tracks/delete', data: {'ids': ids});
+  }
+
+  Future<void> recordPlay(String trackId) async {
+    await _api.post('/api/tracks/$trackId/play');
+  }
+
+  Future<List<Track>> getPlayHistory({int limit = 50}) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/api/history',
+      params: {'limit': limit},
+    );
+    final list = data['data'] as List<dynamic>;
+    return list.map((e) => Track.fromJson(e)).toList();
   }
 }
 

@@ -8,6 +8,8 @@ import 'package:music/features/home/home_page.dart';
 import 'package:music/features/library/duplicate_cleaning_page.dart';
 import 'package:music/features/library/library_page.dart';
 import 'package:music/features/player/player_page.dart';
+import 'package:music/features/search/network_search_page.dart';
+import 'package:music/features/search/search_page.dart';
 import 'package:music/features/settings/settings_page.dart';
 import 'package:music/features/shell/main_shell.dart';
 import 'package:music/features/tasks/tasks_page.dart';
@@ -74,6 +76,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/library/duplicates',
         builder: (context, state) => const DuplicateCleaningPage(),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchPage(),
+      ),
+      GoRoute(
+        path: '/network-search',
+        builder: (context, state) => const NetworkSearchPage(),
       ),
     ],
   );

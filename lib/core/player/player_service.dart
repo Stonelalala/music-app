@@ -147,6 +147,35 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _playCurrentTrack();
   }
 
+  void refreshTrackMetadata(Track updatedTrack) {
+    final queueIndex = _queue.indexWhere((item) => item.id == updatedTrack.id);
+    if (queueIndex != -1) {
+      _queue = List<Track>.from(_queue)..[queueIndex] = updatedTrack;
+    }
+
+    final historyIndex = _history.indexWhere((item) => item.id == updatedTrack.id);
+    if (historyIndex != -1) {
+      _history[historyIndex] = updatedTrack;
+      unawaited(_persistHistory());
+    }
+
+    if (currentTrack?.id == updatedTrack.id) {
+      final currentItem = mediaItem.value;
+      if (currentItem != null) {
+        mediaItem.add(
+          currentItem.copyWith(
+            title: updatedTrack.title,
+            artist: updatedTrack.artist,
+            album: updatedTrack.album,
+            duration: Duration(seconds: updatedTrack.duration.toInt()),
+          ),
+        );
+      }
+    }
+
+    notifyListeners();
+  }
+
   void _rebuildPlayOrder({required int startIndex}) {
     _playOrder = List<int>.generate(_queue.length, (i) => i);
     if (_playOrder.isEmpty) {

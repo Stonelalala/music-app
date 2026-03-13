@@ -66,6 +66,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         token: token,
         baseUrl: baseUrl,
         username: username,
+        password: _passCtrl.text,
       );
 
       ref.read(playerHandlerProvider).setAuth(token, baseUrl);
