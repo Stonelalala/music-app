@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/http/api_client.dart';
 import '../../../shared/models/track.dart';
-import '../../../shared/theme/app_theme.dart';
 import '../../../core/player/player_service.dart';
 import '../../../shared/widgets/modern_toast.dart';
 
@@ -20,10 +19,17 @@ class TrackEditSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: TrackEditSheet(track: track, onSaved: onSaved),
+        child: SafeArea(
+          top: false,
+          child: FractionallySizedBox(
+            heightFactor: 0.84,
+            child: TrackEditSheet(track: track, onSaved: onSaved),
+          ),
+        ),
       ),
     );
   }
@@ -36,6 +42,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
   late TextEditingController _titleCtrl;
   late TextEditingController _artistCtrl;
   late TextEditingController _albumCtrl;
+  late TextEditingController _yearCtrl;
   late TextEditingController _lyricsCtrl;
   bool _isSaving = false;
   bool _isSearching = false;
@@ -46,6 +53,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     _titleCtrl = TextEditingController(text: widget.track.title);
     _artistCtrl = TextEditingController(text: widget.track.artist);
     _albumCtrl = TextEditingController(text: widget.track.album);
+    _yearCtrl = TextEditingController(text: widget.track.year ?? '');
 
     // Lyrics are fetched separately as they might be large
     _lyricsCtrl = TextEditingController();
@@ -72,6 +80,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     _titleCtrl.dispose();
     _artistCtrl.dispose();
     _albumCtrl.dispose();
+    _yearCtrl.dispose();
     _lyricsCtrl.dispose();
     super.dispose();
   }
@@ -89,6 +98,9 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
               'title': _titleCtrl.text.trim(),
               'artist': _artistCtrl.text.trim(),
               'album': _albumCtrl.text.trim(),
+              'year': _yearCtrl.text.trim().isEmpty
+                  ? null
+                  : _yearCtrl.text.trim(),
               'lyrics': _lyricsCtrl.text.trim(),
             },
           );
@@ -100,6 +112,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
           title: _titleCtrl.text.trim(),
           artist: _artistCtrl.text.trim(),
           album: _albumCtrl.text.trim(),
+          year: _yearCtrl.text.trim().isEmpty ? null : _yearCtrl.text.trim(),
           extension: widget.track.extension,
           duration: widget.track.duration,
           size: widget.track.size,
@@ -108,10 +121,10 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
           filepath: widget.track.filepath,
           relativePath: widget.track.relativePath,
         );
-        
+
         // 通知播放服务更新当前状态
         ref.read(playerHandlerProvider).refreshTrackMetadata(updatedTrack);
-        
+
         ModernToast.show(context, '保存成功', icon: Icons.check_circle_outline);
         widget.onSaved?.call();
         Navigator.pop(context);
@@ -140,7 +153,9 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
 
     setState(() => _isSearching = true);
     try {
-      final res = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+      final res = await ref
+          .read(apiClientProvider)
+          .get<Map<String, dynamic>>(
             '/api/search-metadata?q=${Uri.encodeComponent(query)}&source=$_scrapeSource',
           );
 
@@ -170,31 +185,37 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
   }
 
   void _showSearchResults(List<Map<String, dynamic>> results) {
+    final colorScheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surfaceElevated,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+        ),
       ),
       builder: (ctx) {
         return Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Text(
                 '选择匹配的数据',
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color: colorScheme.onSurface,
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             Expanded(
               child: ListView.separated(
                 itemCount: results.length,
-                separatorBuilder: (_, index) =>
-                    const Divider(color: AppTheme.border, height: 1),
+                separatorBuilder: (_, index) => Divider(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+                  height: 1,
+                ),
                 itemBuilder: (ctx, i) {
                   final item = results[i];
                   return ListTile(
@@ -209,22 +230,22 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                               errorBuilder: (_, error, stackTrace) => Container(
                                 width: 40,
                                 height: 40,
-                                color: AppTheme.surface,
-                                child: const Icon(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: Icon(
                                   Icons.music_note,
-                                  color: AppTheme.accent,
+                                  color: colorScheme.primary,
                                 ),
                               ),
                             ),
                           )
-                        : const Icon(Icons.music_note),
+                        : Icon(Icons.music_note, color: colorScheme.primary),
                     title: Text(
                       item['title'] ?? '未知标题',
-                      style: const TextStyle(color: AppTheme.textPrimary),
+                      style: TextStyle(color: colorScheme.onSurface),
                     ),
                     subtitle: Text(
                       '${item['artist'] ?? ''} - ${item['album'] ?? ''}',
-                      style: const TextStyle(color: AppTheme.textSecondary),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                     onTap: () {
                       Navigator.pop(ctx);
@@ -238,8 +259,11 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                         if (item['album'] != null) {
                           _albumCtrl.text = item['album'];
                         }
+                        if (item['year'] != null) {
+                          _yearCtrl.text = item['year'].toString();
+                        }
                       });
-                      
+
                       // 选中数据后异步抓取歌词
                       _fetchLyricsForSelection(item);
                     },
@@ -255,10 +279,14 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surfaceElevated,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -268,13 +296,13 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
             padding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     '编辑曲目信息',
                     style: TextStyle(
-                      color: AppTheme.textPrimary,
+                      color: colorScheme.onSurface,
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -288,10 +316,12 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                         )
                       : const Icon(Icons.cloud_download_outlined, size: 18),
                   label: const Text('从网络刮削'),
-                  style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -305,10 +335,10 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 刮削设置 (Scrape Source)
-                  const Text(
+                  Text(
                     '刮削设置 (选择来源)',
                     style: TextStyle(
-                      color: AppTheme.textSecondary,
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -330,6 +360,8 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
                   _buildTextField('艺术家', _artistCtrl),
                   const SizedBox(height: 16),
                   _buildTextField('专辑', _albumCtrl),
+                  const SizedBox(height: 16),
+                  _buildTextField('年份', _yearCtrl),
                   const SizedBox(height: 16),
                   _buildTextField(
                     '歌词 (LRC)',
@@ -356,8 +388,8 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accent,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                   minimumSize: const Size(double.infinity, 50),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -396,11 +428,16 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
       final title = item['title'] ?? '';
       final artist = item['artist'] ?? '';
       final id = item['id']?.toString() ?? '';
-      
-      final url = '/api/lyrics/search-web?title=${Uri.encodeComponent(title)}&artist=${Uri.encodeComponent(artist)}&source=$_scrapeSource&id=$id';
-      
-      final res = await ref.read(apiClientProvider).get<Map<String, dynamic>>(url);
-      if (res['success'] == true && res['lyrics'] != null && res['lyrics'].toString().isNotEmpty) {
+
+      final url =
+          '/api/lyrics/search-web?title=${Uri.encodeComponent(title)}&artist=${Uri.encodeComponent(artist)}&source=$_scrapeSource&id=$id';
+
+      final res = await ref
+          .read(apiClientProvider)
+          .get<Map<String, dynamic>>(url);
+      if (res['success'] == true &&
+          res['lyrics'] != null &&
+          res['lyrics'].toString().isNotEmpty) {
         if (mounted) {
           setState(() {
             _lyricsCtrl.text = res['lyrics'] as String;
@@ -409,7 +446,11 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
         }
       } else {
         if (mounted) {
-          ModernToast.show(context, '未找到该曲目的歌词', icon: Icons.warning_amber_rounded);
+          ModernToast.show(
+            context,
+            '未找到该曲目的歌词',
+            icon: Icons.warning_amber_rounded,
+          );
         }
       }
     } catch (e) {
@@ -425,6 +466,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
 
   Widget _buildSourceChip(String label, String value) {
     final isSelected = _scrapeSource == value;
+    final colorScheme = Theme.of(context).colorScheme;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -433,20 +475,22 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
           setState(() => _scrapeSource = value);
         }
       },
-      selectedColor: AppTheme.accent.withValues(alpha: 0.2),
+      selectedColor: colorScheme.primary.withValues(alpha: 0.16),
       labelStyle: TextStyle(
-        color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         fontSize: 12,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isSelected ? AppTheme.accent : AppTheme.border,
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.outlineVariant.withValues(alpha: 0.42),
         ),
       ),
       showCheckmark: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.3),
     );
   }
 
@@ -457,6 +501,7 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     int maxLines = 1,
     Widget? suffix,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -464,16 +509,16 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ),
             if (isRequired)
-              const Text(
+              Text(
                 ' *',
-                style: TextStyle(color: AppTheme.errorColor, fontSize: 13),
+                style: TextStyle(color: colorScheme.error, fontSize: 13),
               ),
             const Spacer(),
             if (suffix != null) ...[suffix],
@@ -483,21 +528,25 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
         TextField(
           controller: controller,
           maxLines: maxLines,
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+          style: TextStyle(color: colorScheme.onSurface, fontSize: 15),
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppTheme.surface,
+            fillColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.55),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.border),
+              borderSide: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.42),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.border),
+              borderSide: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.42),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.accent, width: 2),
+              borderSide: BorderSide(color: colorScheme.primary, width: 2),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: 16,

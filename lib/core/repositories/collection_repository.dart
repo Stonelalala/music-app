@@ -80,15 +80,45 @@ class CollectionRepository {
   }
 
   Future<UserPlaylist> createPlaylist(String name) async {
+    return createPlaylistWithTracks(name, const []);
+  }
+
+  Future<UserPlaylist> createPlaylistWithTracks(
+    String name,
+    List<String> trackIds, {
+    String? coverTrackId,
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name,
+      'trackIds': trackIds,
+    };
+    if (coverTrackId != null) {
+      payload['coverTrackId'] = coverTrackId;
+    }
     final data = await _api.post<Map<String, dynamic>>(
       '/api/playlists',
-      data: {'name': name},
+      data: payload,
     );
     return UserPlaylist.fromJson(data['data'] as Map<String, dynamic>);
   }
 
+  Future<void> updatePlaylist(
+    String playlistId, {
+    String? name,
+    String? coverTrackId,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (name != null) {
+      payload['name'] = name;
+    }
+    if (coverTrackId != null) {
+      payload['coverTrackId'] = coverTrackId;
+    }
+    await _api.dio.patch('/api/playlists/$playlistId', data: payload);
+  }
+
   Future<void> renamePlaylist(String playlistId, String name) async {
-    await _api.dio.patch('/api/playlists/$playlistId', data: {'name': name});
+    await updatePlaylist(playlistId, name: name);
   }
 
   Future<void> deletePlaylist(String playlistId) async {
@@ -101,6 +131,55 @@ class CollectionRepository {
 
   Future<void> removeTrackFromPlaylist(String playlistId, String trackId) async {
     await _api.delete('/api/playlists/$playlistId/tracks/$trackId');
+  }
+
+  Future<void> reorderPlaylistTracks(
+    String playlistId,
+    List<String> trackIds, {
+    String? coverTrackId,
+  }) async {
+    final payload = <String, dynamic>{
+      'trackIds': trackIds,
+    };
+    if (coverTrackId != null) {
+      payload['coverTrackId'] = coverTrackId;
+    }
+    await _api.dio.put(
+      '/api/playlists/$playlistId/tracks/reorder',
+      data: payload,
+    );
+  }
+
+  Future<List<SmartPlaylistSummary>> getSmartPlaylists() async {
+    final data = await _api.get<Map<String, dynamic>>('/api/playlists/smart');
+    final list = data['data'] as List<dynamic>? ?? const [];
+    return list
+        .map((item) => SmartPlaylistSummary.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PlaylistDetail> getSmartPlaylistDetail(String smartId) async {
+    final key = smartId.replaceFirst('smart:', '');
+    final data = await _api.get<Map<String, dynamic>>('/api/playlists/smart/$key');
+    return PlaylistDetail.fromJson(data['data'] as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> exportData() async {
+    final data = await _api.get<Map<String, dynamic>>('/api/data/export');
+    return data['data'] as Map<String, dynamic>? ?? const {};
+  }
+
+  Future<void> importData(
+    Map<String, dynamic> payload, {
+    bool replace = false,
+  }) async {
+    await _api.post(
+      '/api/data/import',
+      data: {
+        'mode': replace ? 'replace' : 'merge',
+        'data': payload,
+      },
+    );
   }
 
   Future<PlayStats> getPlayStats() async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/player/player_service.dart';
 import 'core/player/cache_service.dart';
 import 'core/auth/auth_service.dart';
+import 'core/repositories/sync_repository.dart';
 import 'core/router/router.dart';
 import 'shared/theme/app_theme.dart';
 import 'features/settings/settings_provider.dart';
@@ -51,6 +54,40 @@ class MusicApp extends ConsumerStatefulWidget {
 }
 
 class _MusicAppState extends ConsumerState<MusicApp> {
+  Future<void> _syncPreferencesFromServer() async {
+    final auth = ref.read(authServiceProvider);
+    if (!auth.isAuthenticated) {
+      return;
+    }
+
+    final syncRepository = ref.read(syncRepositoryProvider);
+    final player = ref.read(playerHandlerProvider);
+    player.setRemotePreferenceSync(syncRepository.setPreference);
+
+    try {
+      final remotePreferences = await syncRepository.getPreferences();
+      final remoteTheme = remotePreferences['theme_type'] as String?;
+      if (remoteTheme != null) {
+        final type = ThemeType.values.firstWhere(
+          (item) => item.name == remoteTheme,
+          orElse: () => ThemeType.system,
+        );
+        await ref.read(themeTypeProvider.notifier).setTheme(type);
+      }
+
+      final remoteCacheSize = remotePreferences['max_cache_size_mb'];
+      if (remoteCacheSize is num) {
+        await ref
+            .read(settingsProvider.notifier)
+            .setMaxCacheSize(remoteCacheSize.toInt());
+      }
+
+      await player.applyRemotePreferences(remotePreferences);
+    } catch (e) {
+      debugPrint('Remote preference sync failed: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +108,7 @@ class _MusicAppState extends ConsumerState<MusicApp> {
       final cacheService = ref.read(cacheServiceProvider);
       final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
       ref.read(playerHandlerProvider).setCacheConfig(cacheService, maxBytes);
+      await _syncPreferencesFromServer();
     });
   }
 
@@ -80,6 +118,7 @@ class _MusicAppState extends ConsumerState<MusicApp> {
     ref.listen(authServiceProvider, (previous, next) {
       if (next.isAuthenticated && next.token != null && next.baseUrl != null) {
         ref.read(playerHandlerProvider).setAuth(next.token!, next.baseUrl!);
+        Future.microtask(_syncPreferencesFromServer);
       }
     });
 
@@ -88,6 +127,21 @@ class _MusicAppState extends ConsumerState<MusicApp> {
       final cacheService = ref.read(cacheServiceProvider);
       final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
       ref.read(playerHandlerProvider).setCacheConfig(cacheService, maxBytes);
+      if (ref.read(authServiceProvider).isAuthenticated) {
+        unawaited(
+          ref
+              .read(syncRepositoryProvider)
+              .setPreference('max_cache_size_mb', next.maxCacheSizeMB),
+        );
+      }
+    });
+
+    ref.listen(themeTypeProvider, (previous, next) {
+      if (ref.read(authServiceProvider).isAuthenticated) {
+        unawaited(
+          ref.read(syncRepositoryProvider).setPreference('theme_type', next.name),
+        );
+      }
     });
 
     final router = ref.watch(routerProvider);

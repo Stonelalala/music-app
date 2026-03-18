@@ -52,10 +52,39 @@ class TrackRepository {
       final data = await _api.get<Map<String, dynamic>>(
         '/api/tracks/$trackId/lyrics',
       );
-      return data['data'] as String?;
+      return (data['lyrics'] ?? data['data']) as String?;
     } catch (_) {
       return null;
     }
+  }
+
+  Future<String?> searchAndApplyLyrics(
+    Track track, {
+    String source = 'auto',
+  }) async {
+    final response = await _api.get<Map<String, dynamic>>(
+      '/api/lyrics/search-web',
+      params: {
+        'title': track.title,
+        'artist': track.artist,
+        'source': source,
+      },
+    );
+    final lyrics = response['lyrics'] as String?;
+    if (lyrics == null || lyrics.trim().isEmpty) {
+      return null;
+    }
+    await _api.post(
+      '/api/tracks/${track.id}',
+      data: {
+        'title': track.title,
+        'artist': track.artist,
+        'album': track.album,
+        'year': track.year,
+        'lyrics': lyrics,
+      },
+    );
+    return lyrics;
   }
 
   Future<List<dynamic>> getRecommendSongs() async {

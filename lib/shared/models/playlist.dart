@@ -5,6 +5,7 @@ class UserPlaylist {
   final String name;
   final int trackCount;
   final String? coverTrackId;
+  final String? customCoverTrackId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -13,6 +14,7 @@ class UserPlaylist {
     required this.name,
     required this.trackCount,
     this.coverTrackId,
+    this.customCoverTrackId,
     this.createdAt,
     this.updatedAt,
   });
@@ -22,9 +24,29 @@ class UserPlaylist {
     name: (json['name'] as String?) ?? '未命名歌单',
     trackCount: (json['track_count'] as num?)?.toInt() ?? 0,
     coverTrackId: json['cover_track_id'] as String?,
+    customCoverTrackId: json['cover'] as String?,
     createdAt: _parseDateTime(json['created_at']),
     updatedAt: _parseDateTime(json['updated_at']),
   );
+}
+
+class SmartPlaylistSummary {
+  final String id;
+  final String name;
+  final String description;
+
+  const SmartPlaylistSummary({
+    required this.id,
+    required this.name,
+    required this.description,
+  });
+
+  factory SmartPlaylistSummary.fromJson(Map<String, dynamic> json) =>
+      SmartPlaylistSummary(
+        id: json['id'] as String,
+        name: (json['name'] as String?) ?? 'Smart Playlist',
+        description: (json['description'] as String?) ?? '',
+      );
 }
 
 class PlaylistDetail extends UserPlaylist {
@@ -36,6 +58,7 @@ class PlaylistDetail extends UserPlaylist {
     required super.trackCount,
     required this.tracks,
     super.coverTrackId,
+    super.customCoverTrackId,
     super.createdAt,
     super.updatedAt,
   });
@@ -45,6 +68,7 @@ class PlaylistDetail extends UserPlaylist {
     name: (json['name'] as String?) ?? '未命名歌单',
     trackCount: (json['track_count'] as num?)?.toInt() ?? 0,
     coverTrackId: json['cover_track_id'] as String?,
+    customCoverTrackId: json['cover'] as String?,
     createdAt: _parseDateTime(json['created_at']),
     updatedAt: _parseDateTime(json['updated_at']),
     tracks: ((json['tracks'] as List<dynamic>?) ?? const [])

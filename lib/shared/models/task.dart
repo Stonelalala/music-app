@@ -3,6 +3,7 @@ class TaskItem {
   final String? parentId;
   final String type;
   final String status;
+  final int priority;
   final double progress;
   final String? message;
   final String? logs;
@@ -13,6 +14,7 @@ class TaskItem {
     this.parentId,
     required this.type,
     required this.status,
+    required this.priority,
     required this.progress,
     this.message,
     this.logs,
@@ -21,14 +23,18 @@ class TaskItem {
 
   factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
     id: json['id'] as String,
-    parentId: json['parentId'] as String?,
+    parentId: (json['parentId'] ?? json['parent_id']) as String?,
     type: (json['type'] as String?) ?? 'unknown',
     status: (json['status'] as String?) ?? 'pending',
+    priority: ((json['priority'] as num?) ?? 0).toInt(),
     progress: ((json['progress'] as num?) ?? 0).toDouble(),
     message: json['message'] as String?,
     logs: json['logs'] as String?,
     createdAt:
-        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+        DateTime.tryParse(
+              (json['createdAt'] ?? json['created_at']) as String? ?? '',
+            ) ??
+            DateTime.now(),
   );
 
   bool get isRunning => status == 'running' || status == 'pending';
@@ -36,13 +42,26 @@ class TaskItem {
   bool get isFailed => status == 'failed';
   bool get isCancelled => status == 'cancelled';
   bool get isDone => isCompleted || isFailed || isCancelled;
+  bool get canRetry =>
+      isFailed &&
+      const {
+        'scan',
+        'scrape',
+        'download_netease',
+        'download_qq',
+        'download_kugou',
+        'download_kuwo',
+      }.contains(type);
+  bool get canAdjustPriority => !isDone;
 
   String get typeLabel {
     const labels = {
       'scan': '扫描',
-      'scrape': '刮削元数据',
+      'scrape': '刮削',
       'download_netease': '网易云下载',
-      'download_qq': 'QQ音乐下载',
+      'download_qq': 'QQ 音乐下载',
+      'download_kugou': '酷狗下载',
+      'download_kuwo': '酷我下载',
       'organize': '整理文件',
       'rename': '批量重命名',
       'playlist_import': '导入歌单',

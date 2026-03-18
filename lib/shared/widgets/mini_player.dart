@@ -38,6 +38,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
   @override
   Widget build(BuildContext context) {
     final handler = ref.watch(playerHandlerProvider);
+    final expandedWidth = MediaQuery.of(context).size.width - 72;
 
     return StreamBuilder<MediaItem?>(
       stream: handler.mediaItem,
@@ -73,8 +74,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
-                  height: 56,
-                  width: _isExpanded ? MediaQuery.of(context).size.width - 72 : 148,
+                  height: 64,
+                  width: _isExpanded ? expandedWidth : 148,
                   margin: const EdgeInsets.fromLTRB(36, 0, 36, 16),
                   child: Stack(
                     children: [
@@ -91,10 +92,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                       // 前景内容区
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
+                          color: Theme.of(context).colorScheme.surfaceContainer
+                              .withValues(alpha: 0.72),
                           borderRadius: BorderRadius.circular(40),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05),
+                            color: Theme.of(context).colorScheme.outlineVariant
+                                .withValues(alpha: 0.18),
                             width: 1,
                           ),
                         ),
@@ -102,9 +105,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                           physics: const NeverScrollableScrollPhysics(),
                           scrollDirection: Axis.horizontal,
                           child: SizedBox(
-                            width: _isExpanded
-                                ? MediaQuery.of(context).size.width - 72
-                                : 148,
+                            width: _isExpanded ? expandedWidth : 148,
                             child: Row(
                               children: [
                                 if (_isExpanded)
@@ -126,85 +127,31 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                     ),
                                   ),
                                 if (_isExpanded) const SizedBox(width: 4),
-                                // Album Art with Progress Ring
-                                StreamBuilder<Duration>(
-                                  stream: AudioService.position,
-                                  builder: (context, posSnap) {
-                                    final position = posSnap.data ?? Duration.zero;
-                                    final duration = item.duration ?? Duration.zero;
-                                    final progress = duration.inMilliseconds > 0
-                                        ? position.inMilliseconds / duration.inMilliseconds
-                                        : 0.0;
-  
-                                    return GestureDetector(
-                                      onTap: () {
-                                        if (!_isExpanded) {
-                                          setState(() {
-                                            _isExpanded = true;
-                                          });
-                                        } else {
-                                          context.push('/player');
-                                        }
-                                      },
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          // Progress Ring
-                                          CustomPaint(
-                                            size: const Size(56, 56),
-                                            painter: _CircularProgressPainter(
-                                              progress: progress,
-                                              color: Theme.of(context).colorScheme.primary,
-                                              backgroundColor: Colors.white.withValues(alpha: 0.1),
-                                            ),
-                                          ),
-                                          AnimatedBuilder(
-                                            animation: _rotationController,
-                                            builder: (context, child) {
-                                              return Transform.rotate(
-                                                angle: _rotationController.value * 2 * 3.1415926,
-                                                alignment: Alignment.center,
-                                                child: child,
-                                              );
-                                            },
-                                            child: Container(
-                                              width: 48,
-                                              height: 48,
-                                              decoration: const BoxDecoration(
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: ClipOval(
-                                                child: CachedNetworkImage(
-                                                  imageUrl: '${item.artUri}',
-                                                  cacheKey: 'cover_${item.id}',
-                                                  key: ValueKey(item.id),
-                                                  fit: BoxFit.cover,
-                                                  errorWidget: (context, url, error) => Container(
-                                                    color: AppTheme.surfaceElevated,
-                                                    child: const Icon(
-                                                      Icons.music_note,
-                                                      color: AppTheme.accent,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                _MiniPlayerArtwork(
+                                  item: item,
+                                  isExpanded: _isExpanded,
+                                  rotationController: _rotationController,
+                                  onTap: () {
+                                    if (!_isExpanded) {
+                                      setState(() {
+                                        _isExpanded = true;
+                                      });
+                                    } else {
+                                      context.push('/player');
+                                    }
                                   },
                                 ),
-                                const SizedBox(width: 8),
-                                // Info
+                                const SizedBox(width: 10),
                                 if (_isExpanded)
                                   Expanded(
                                     child: GestureDetector(
                                       onTap: () => context.push('/player'),
                                       behavior: HitTestBehavior.opaque,
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             item.title,
@@ -220,9 +167,14 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                           Text(
                                             item.artist ?? '',
                                             style: TextStyle(
-                                              color: AppTheme.textSecondary.withValues(alpha: 0.9),
+                                              color: AppTheme.textSecondary
+                                                  .withValues(alpha: 0.9),
                                               fontSize: 11,
-                                              fontStyle: (item.artist?.startsWith('[') ?? false)
+                                              fontStyle:
+                                                  (item.artist?.startsWith(
+                                                        '[',
+                                                      ) ??
+                                                      false)
                                                   ? FontStyle.italic
                                                   : FontStyle.normal,
                                             ),
@@ -233,19 +185,28 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                       ),
                                     ),
                                   ),
+                                if (_isExpanded) const SizedBox(width: 8),
                                 // Controls group
                                 GestureDetector(
-                                  onTap: () => isPlaying ? handler.pause() : handler.play(),
+                                  onTap: () => isPlaying
+                                      ? handler.pause()
+                                      : handler.play(),
                                   child: Container(
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
                                       size: 22,
                                     ),
                                   ),
@@ -258,7 +219,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                     onPressed: () => handler.skipToNext(),
                                     icon: Icon(
                                       Icons.skip_next_rounded,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                       size: 22,
                                     ),
                                   ),
@@ -270,16 +233,18 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                       padding: EdgeInsets.zero,
                                       icon: Icon(
                                         Icons.playlist_play_rounded,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                         size: 22,
                                       ),
-                                      onPressed: () => GlobalPlaylist.show(context, ref),
+                                      onPressed: () =>
+                                          GlobalPlaylist.show(context, ref),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                                 ],
-                                if (!_isExpanded)
-                                  const SizedBox(width: 12),
+                                if (!_isExpanded) const SizedBox(width: 12),
                               ],
                             ),
                           ),
@@ -291,6 +256,96 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _MiniPlayerArtwork extends StatelessWidget {
+  const _MiniPlayerArtwork({
+    required this.item,
+    required this.isExpanded,
+    required this.rotationController,
+    required this.onTap,
+  });
+
+  final MediaItem item;
+  final bool isExpanded;
+  final AnimationController rotationController;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return StreamBuilder<Duration>(
+      stream: AudioService.position,
+      builder: (context, posSnap) {
+        final position = posSnap.data ?? Duration.zero;
+        final duration = item.duration ?? Duration.zero;
+        final progress = duration.inMilliseconds > 0
+            ? position.inMilliseconds / duration.inMilliseconds
+            : 0.0;
+
+        return GestureDetector(
+          onTap: onTap,
+          child: SizedBox(
+            width: isExpanded ? 58 : 54,
+            height: isExpanded ? 58 : 54,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CustomPaint(
+                  size: Size.square(isExpanded ? 56 : 52),
+                  painter: _CircularProgressPainter(
+                    progress: progress.clamp(0.0, 1.0),
+                    color: colorScheme.primary,
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: rotationController,
+                  builder: (context, child) {
+                    return Transform.rotate(
+                      angle: rotationController.value * 2 * 3.1415926,
+                      alignment: Alignment.center,
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    width: isExpanded ? 46 : 42,
+                    height: isExpanded ? 46 : 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: '${item.artUri}',
+                        cacheKey: 'cover_${item.id}',
+                        key: ValueKey(item.id),
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Container(
+                          color: AppTheme.surfaceElevated,
+                          child: const Icon(
+                            Icons.music_note,
+                            color: AppTheme.accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

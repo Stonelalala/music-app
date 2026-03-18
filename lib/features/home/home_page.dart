@@ -6,13 +6,14 @@ import '../../core/player/player_service.dart';
 import '../../core/repositories/collection_repository.dart';
 import '../../core/repositories/track_repository.dart';
 import '../../features/library/library_page.dart';
-import '../library/widgets/track_edit_sheet.dart';
 import '../my/collection_providers.dart';
 import '../../shared/models/track.dart';
 import '../../shared/models/playlist.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audio_service/audio_service.dart';
+import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/modern_toast.dart';
+import '../../shared/widgets/playlist_detail_sheet.dart';
 import '../../shared/widgets/track_action_sheet.dart';
 
 final randomSongsProvider = FutureProvider.autoDispose<List<Track>>((
@@ -32,7 +33,9 @@ final recommendedAlbumsProvider =
       return ref.watch(trackRepositoryProvider).getDiscoveryAlbums();
     });
 
-final playHistoryProvider = FutureProvider.autoDispose<List<Track>>((ref) async {
+final playHistoryProvider = FutureProvider.autoDispose<List<Track>>((
+  ref,
+) async {
   final history = await ref.watch(trackRepositoryProvider).getPlayHistory();
   // 去重：保留每个 ID 第一次出现的记录（通常是最新的）
   final seenIds = <String>{};
@@ -59,8 +62,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final auth = ref.watch(authServiceProvider);
     final baseUrl = auth.baseUrl ?? '';
     final token = auth.token ?? '';
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -77,66 +82,81 @@ class _HomePageState extends ConsumerState<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      '音乐',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.heroGradient(colorScheme),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.14),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.10),
+                        blurRadius: 24,
+                        offset: const Offset(0, 14),
                       ),
-                    ),
-                    const Spacer(),
-                    // Search Button
-                    GestureDetector(
-                      onTap: () => context.push('/search'),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.search_rounded,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '音乐',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: const SizedBox.shrink()),
+                          // Search Button
+                          GestureDetector(
+                            onTap: () => context.push('/search'),
+                            child: Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface.withValues(
+                                  alpha: 0.34,
+                                ),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: colorScheme.outlineVariant.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.search_rounded,
+                                size: 19,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          // Rotating Disc (Mini version for Header)
+                          const _TopPlayingIndicator(),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Rotating Disc (Mini version for Header)
-                    const _TopPlayingIndicator(),
-                    const SizedBox(width: 4),
-                    // Settings Button
-                    IconButton(
-                      onPressed: () => context.push('/settings'),
-                      icon: const Icon(Icons.settings_outlined),
-                      iconSize: 22,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      tooltip: '设置',
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      _buildMyLibraryEntrances(
+                        context,
+                        favoritesAsync,
+                        playlistsAsync,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 10),
-                _buildMyLibraryEntrances(
-                  context,
-                  favoritesAsync,
-                  playlistsAsync,
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
                 // 1. Random Discovery
                 _buildSectionHeader(
                   context,
                   '随机发现',
-                  showSeeAll: true,
-                  seeAllText: '查看全部',
-                  onSeeAll: () => randomAsync.whenData(
-                    (tracks) => _showTrackListPopup(context, '随机发现', tracks),
-                  ),
-                  // 播放全部按钮
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => randomAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -171,10 +191,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildSectionHeader(
                   context,
                   '最近添加',
-                  showSeeAll: true,
-                  onSeeAll: () => recentAsync.whenData(
-                    (tracks) => _showTrackListPopup(context, '最近添加', tracks),
-                  ),
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => recentAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -209,10 +225,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildSectionHeader(
                   context,
                   '播放历史',
-                  showSeeAll: true,
-                  onSeeAll: () => historyAsync.whenData(
-                    (tracks) => _showTrackListPopup(context, '播放历史', tracks),
-                  ),
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => historyAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -257,13 +269,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 const SizedBox(height: 16),
 
                 // 4. Recommended Albums
-                _buildSectionHeader(
-                  context,
-                  '探索专辑',
-                  showSeeAll: true,
-                  seeAllText: '换一批',
-                  onSeeAll: () => ref.invalidate(recommendedAlbumsProvider),
-                ),
+                _buildSectionHeader(context, '探索专辑'),
                 const SizedBox(height: 16),
                 albumsAsync.when(
                   loading: () => const _SectionLoading(height: 160),
@@ -316,7 +322,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     AsyncValue<List<UserPlaylist>> playlistsAsync,
   ) {
     return SizedBox(
-      height: 92,
+      height: 86,
       child: Row(
         children: [
           Expanded(
@@ -368,26 +374,41 @@ class _HomePageState extends ConsumerState<HomePage> {
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        height: 92,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        height: 86,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surface.withValues(alpha: 0.42),
+              colorScheme.surfaceContainerHigh.withValues(alpha: 0.68),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: accentColor.withValues(alpha: 0.18)),
         ),
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(16),
+                color: accentColor.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.16),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: accentColor, size: 24),
+              child: Icon(icon, color: accentColor, size: 21),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -396,7 +417,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   Text(
                     label,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -404,9 +425,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   Text(
                     countText,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      color: colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -417,65 +438,51 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
     );
   }
+
   Widget _buildSectionHeader(
     BuildContext context,
     String title, {
-    bool showSeeAll = false,
-    String seeAllText = '查看全部',
-    VoidCallback? onSeeAll,
     IconData? actionIcon,
     VoidCallback? onAction,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
             ),
-            if (actionIcon != null && onAction != null) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onAction,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.play_arrow_rounded,
-                    color: colorScheme.onPrimary,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
-        if (showSeeAll)
-          TextButton(
-            onPressed: onSeeAll,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              seeAllText,
-              style: TextStyle(
+        const Spacer(),
+        if (actionIcon != null && onAction != null)
+          GestureDetector(
+            onTap: onAction,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
                 color: colorScheme.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.22),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
+              alignment: Alignment.center,
+              child: Icon(actionIcon, color: colorScheme.onPrimary, size: 18),
             ),
           ),
       ],
@@ -486,10 +493,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     _showTrackListPopup(context, '我的收藏', tracks);
   }
 
-  void _showPlaylistsSheet(
-    BuildContext context,
-    List<UserPlaylist> playlists,
-  ) {
+  void _showPlaylistsSheet(BuildContext context, List<UserPlaylist> playlists) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -553,7 +557,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.14),
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.14,
+                              ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Icon(
@@ -566,7 +572,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () {
                             Navigator.of(context).pop();
-                            _showPlaylistDetail(this.context, playlist.id);
+                            PlaylistDetailSheet.show(this.context, playlist.id);
                           },
                         ),
                       );
@@ -630,6 +636,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  // ignore: unused_element
   void _showPlaylistDetail(BuildContext context, String playlistId) {
     showModalBottomSheet<void>(
       context: context,
@@ -707,51 +714,58 @@ class _HomePageState extends ConsumerState<HomePage> {
       onTap: () =>
           ref.read(playerHandlerProvider).loadQueue(queue, startIndex: index),
       child: Container(
-        width: 100,
-        margin: const EdgeInsets.only(right: 12),
+        width: 112,
+        margin: const EdgeInsets.only(right: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: 112,
+              height: 112,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.14),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(22),
                 child: CachedNetworkImage(
                   imageUrl:
                       '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
                   cacheKey: 'cover_${track.id}',
-                  width: 100,
-                  height: 100,
+                  width: 112,
+                  height: 112,
                   fit: BoxFit.cover,
                   errorWidget: (context, url, error) => Container(
-                    width: 100,
-                    height: 100,
+                    width: 112,
+                    height: 112,
                     color: colorScheme.surfaceContainerHighest,
-                    child: Icon(Icons.music_note, color: colorScheme.primary, size: 30),
+                    child: Icon(
+                      Icons.music_note,
+                      color: colorScheme.primary,
+                      size: 30,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 8), 
+            const SizedBox(height: 10),
             Text(
               track.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: colorScheme.onSurface,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 2),
@@ -759,10 +773,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               track.artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFB3B3B3),
-                fontSize: 9,
-              ),
+              style: const TextStyle(color: Color(0xFFB3B3B3), fontSize: 9),
             ),
           ],
         ),
@@ -820,10 +831,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFB3B3B3),
-                fontSize: 9,
-              ),
+              style: const TextStyle(color: Color(0xFFB3B3B3), fontSize: 9),
             ),
           ],
         ),
@@ -1011,16 +1019,31 @@ class _HomePageState extends ConsumerState<HomePage> {
   ) {
     final auth = ref.read(authServiceProvider);
     final colorScheme = Theme.of(context).colorScheme;
+    void openTrackActions() {
+      TrackActionSheet.show(
+        context,
+        ref,
+        track,
+        onChanged: () {
+          ref.invalidate(recentSongsProvider);
+          ref.invalidate(randomSongsProvider);
+          ref.invalidate(playHistoryProvider);
+        },
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04), // zinc-900/40 equivalent on a pure black background
+        color: Colors.white.withValues(
+          alpha: 0.04,
+        ), // zinc-900/40 equivalent on a pure black background
         borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
         onTap: () =>
             ref.read(playerHandlerProvider).loadQueue(queue, startIndex: index),
-        onLongPress: () => TrackActionSheet.show(context, ref, track),
+        onLongPress: openTrackActions,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -1091,7 +1114,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.15),
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -1108,7 +1133,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                         Text(
                           track.sizeText,
                           style: TextStyle(
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
                             fontSize: 10,
                           ),
                         ),
@@ -1123,15 +1150,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   color: colorScheme.onSurfaceVariant,
                   size: 20,
                 ),
-                onPressed: () {
-                  TrackEditSheet.show(
-                    context,
-                    track,
-                    onSaved: () {
-                      ref.invalidate(recentSongsProvider);
-                    },
-                  );
-                },
+                onPressed: openTrackActions,
               ),
             ],
           ),
@@ -1157,7 +1176,8 @@ class _TopPlayingIndicator extends ConsumerStatefulWidget {
   const _TopPlayingIndicator();
 
   @override
-  ConsumerState<_TopPlayingIndicator> createState() => _TopPlayingIndicatorState();
+  ConsumerState<_TopPlayingIndicator> createState() =>
+      _TopPlayingIndicatorState();
 }
 
 class _TopPlayingIndicatorState extends ConsumerState<_TopPlayingIndicator>
@@ -1188,7 +1208,10 @@ class _TopPlayingIndicatorState extends ConsumerState<_TopPlayingIndicator>
         if (item == null) return const SizedBox.shrink();
 
         return StreamBuilder<bool>(
-          stream: ref.watch(playerHandlerProvider).playbackState.map((state) => state.playing),
+          stream: ref
+              .watch(playerHandlerProvider)
+              .playbackState
+              .map((state) => state.playing),
           builder: (context, playingSnap) {
             final isPlaying = playingSnap.data ?? false;
             if (isPlaying && !_rotationController.isAnimating) {

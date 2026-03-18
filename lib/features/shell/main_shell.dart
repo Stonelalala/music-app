@@ -40,7 +40,8 @@ class _MainShellState extends ConsumerState<MainShell> {
             onNotification: (notification) {
               if (notification.direction == rendering.ScrollDirection.reverse) {
                 if (_isVisible) setState(() => _isVisible = false);
-              } else if (notification.direction == rendering.ScrollDirection.forward) {
+              } else if (notification.direction ==
+                  rendering.ScrollDirection.forward) {
                 if (!_isVisible) setState(() => _isVisible = true);
               }
               return false;
@@ -84,15 +85,21 @@ class _MainShellState extends ConsumerState<MainShell> {
                             height: 56,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             decoration: BoxDecoration(
-                              color: const Color.fromRGBO(30, 30, 30, 0.7),
+                              color: colorScheme.surfaceContainer.withValues(
+                                alpha: 0.78,
+                              ),
                               borderRadius: BorderRadius.circular(40),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.1),
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.18,
+                                ),
                                 width: 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.08,
+                                  ),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -102,10 +109,38 @@ class _MainShellState extends ConsumerState<MainShell> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                _buildNavItem(0, Icons.home, Icons.home_outlined, '主页', currentIndex, context),
-                                _buildNavItem(1, Icons.music_note, Icons.music_note_outlined, '歌曲', currentIndex, context),
-                                _buildNavItem(2, Icons.explore, Icons.explore_outlined, '发现', currentIndex, context),
-                                _buildNavItem(3, Icons.person, Icons.person_outline, '我的', currentIndex, context),
+                                _buildNavItem(
+                                  0,
+                                  Icons.home,
+                                  Icons.home_outlined,
+                                  '主页',
+                                  currentIndex,
+                                  context,
+                                ),
+                                _buildNavItem(
+                                  1,
+                                  Icons.music_note,
+                                  Icons.music_note_outlined,
+                                  '歌曲',
+                                  currentIndex,
+                                  context,
+                                ),
+                                _buildNavItem(
+                                  2,
+                                  Icons.explore,
+                                  Icons.explore_outlined,
+                                  '发现',
+                                  currentIndex,
+                                  context,
+                                ),
+                                _buildNavItem(
+                                  3,
+                                  Icons.person,
+                                  Icons.person_outline,
+                                  '我的',
+                                  currentIndex,
+                                  context,
+                                ),
                               ],
                             ),
                           ),
@@ -113,7 +148,6 @@ class _MainShellState extends ConsumerState<MainShell> {
                       ),
                     ),
                   ],
-
                 ),
               ),
             ),
@@ -138,10 +172,18 @@ class _MainShellState extends ConsumerState<MainShell> {
     return GestureDetector(
       onTap: () {
         switch (index) {
-          case 0: context.go('/home'); break;
-          case 1: context.go('/library'); break;
-          case 2: context.go('/discovery'); break;
-          case 3: context.go('/my'); break;
+          case 0:
+            context.go('/home');
+            break;
+          case 1:
+            context.go('/library');
+            break;
+          case 2:
+            context.go('/discovery');
+            break;
+          case 3:
+            context.go('/my');
+            break;
         }
       },
       child: Container(
@@ -150,14 +192,16 @@ class _MainShellState extends ConsumerState<MainShell> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.14)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                isSelected ? activeIcon : icon, 
-                color: isSelected ? activeColor : inactiveColor, 
+                isSelected ? activeIcon : icon,
+                color: isSelected ? activeColor : inactiveColor,
                 size: 20,
               ),
             ),

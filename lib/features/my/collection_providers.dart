@@ -26,6 +26,16 @@ final playlistDetailProvider =
       return ref.watch(collectionRepositoryProvider).getPlaylistDetail(playlistId);
     });
 
+final smartPlaylistsProvider =
+    FutureProvider.autoDispose<List<SmartPlaylistSummary>>((ref) async {
+      return ref.watch(collectionRepositoryProvider).getSmartPlaylists();
+    });
+
+final smartPlaylistDetailProvider =
+    FutureProvider.autoDispose.family<PlaylistDetail, String>((ref, playlistId) async {
+      return ref.watch(collectionRepositoryProvider).getSmartPlaylistDetail(playlistId);
+    });
+
 final playStatsProvider = FutureProvider.autoDispose<PlayStats>((ref) async {
   return ref.watch(collectionRepositoryProvider).getPlayStats();
 });

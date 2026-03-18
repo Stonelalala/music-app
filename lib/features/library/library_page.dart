@@ -6,7 +6,6 @@ import '../../core/player/player_service.dart';
 import '../../core/repositories/track_repository.dart';
 import '../../shared/models/track.dart';
 import '../../shared/widgets/track_action_sheet.dart';
-import 'widgets/track_edit_sheet.dart';
 import 'widgets/library_tools_sheet.dart';
 
 final tracksDataProvider = FutureProvider.family<TracksResponse, String?>(
@@ -29,6 +28,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   String? _filterArtist;
   String? _filterAlbum;
+  String? _filterExtension;
+  String? _filterYear;
+  bool _lyricsOnly = false;
+  bool _scrapedOnly = false;
 
   @override
   void initState() {
@@ -50,6 +53,27 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Widget build(BuildContext context) {
     final tracksAsync = ref.watch(tracksDataProvider(_selectedFolder));
     final colorScheme = Theme.of(context).colorScheme;
+    final availableExtensions = tracksAsync.maybeWhen(
+      data: (data) =>
+          data.tracks
+              .map((track) => track.extension.replaceAll('.', '').toUpperCase())
+              .where((extension) => extension.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort(),
+      orElse: () => <String>[],
+    );
+    final availableYears = tracksAsync.maybeWhen(
+      data: (data) =>
+          data.tracks
+              .map((track) => track.year)
+              .whereType<String>()
+              .where((year) => year.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => b.compareTo(a)),
+      orElse: () => <String>[],
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -86,7 +110,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? colorScheme.primaryContainer
-                                          .withValues(alpha: 0.3)
+                                              .withValues(alpha: 0.3)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
@@ -119,6 +143,85 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '搜索歌曲、歌手、专辑',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => _searchController.clear(),
+                            ),
+                    ),
+                  ),
+                ),
+                if (_activeTab == '歌曲')
+                  SizedBox(
+                    height: 42,
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: const Text('有歌词'),
+                            selected: _lyricsOnly,
+                            onSelected: (selected) {
+                              setState(() => _lyricsOnly = selected);
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: const Text('已刮削'),
+                            selected: _scrapedOnly,
+                            onSelected: (selected) {
+                              setState(() => _scrapedOnly = selected);
+                            },
+                          ),
+                        ),
+                        ...availableYears.map((year) {
+                          final selected = _filterYear == year;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(year),
+                              selected: selected,
+                              onSelected: (isSelected) {
+                                setState(() {
+                                  _filterYear = isSelected ? year : null;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                        ...availableExtensions.map((extension) {
+                          final selected = _filterExtension == extension;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(extension),
+                              selected: selected,
+                              onSelected: (isSelected) {
+                                setState(() {
+                                  _filterExtension = isSelected
+                                      ? extension
+                                      : null;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                if (_activeTab == '歌曲') const SizedBox(height: 8),
 
                 Expanded(
                   child: Row(
@@ -154,6 +257,32 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                             if (_filterAlbum != null) {
                               displayTracks = displayTracks
                                   .where((t) => t.album == _filterAlbum)
+                                  .toList();
+                            }
+                            if (_filterExtension != null) {
+                              displayTracks = displayTracks
+                                  .where(
+                                    (t) =>
+                                        t.extension
+                                            .replaceAll('.', '')
+                                            .toUpperCase() ==
+                                        _filterExtension,
+                                  )
+                                  .toList();
+                            }
+                            if (_filterYear != null) {
+                              displayTracks = displayTracks
+                                  .where((t) => t.year == _filterYear)
+                                  .toList();
+                            }
+                            if (_lyricsOnly) {
+                              displayTracks = displayTracks
+                                  .where((t) => t.hasLyrics)
+                                  .toList();
+                            }
+                            if (_scrapedOnly) {
+                              displayTracks = displayTracks
+                                  .where((t) => t.scrapeStatus == 1)
                                   .toList();
                             }
 
@@ -441,7 +570,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-
   Widget _buildReturnTile(
     BuildContext context, {
     required String label,
@@ -554,6 +682,16 @@ class _TrackTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.read(authServiceProvider);
     final colorScheme = Theme.of(context).colorScheme;
+    void openTrackActions() {
+      TrackActionSheet.show(
+        context,
+        ref,
+        track,
+        onChanged: () {
+          ref.invalidate(tracksDataProvider);
+        },
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -570,7 +708,7 @@ class _TrackTile extends ConsumerWidget {
         onTap: () => ref
             .read(playerHandlerProvider)
             .loadQueue(allTracks, startIndex: index),
-        onLongPress: () => TrackActionSheet.show(context, ref, track),
+        onLongPress: openTrackActions,
         borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
@@ -638,11 +776,24 @@ class _TrackTile extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      if (track.year != null && track.year!.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          track.year!,
+                          style: TextStyle(
+                            color: colorScheme.primary.withValues(alpha: 0.8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Text(
                         track.sizeText,
                         style: TextStyle(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
                           fontSize: 10,
                         ),
                       ),
@@ -657,15 +808,7 @@ class _TrackTile extends ConsumerWidget {
                 color: colorScheme.onSurfaceVariant,
                 size: 20,
               ),
-              onPressed: () {
-                TrackEditSheet.show(
-                  context,
-                  track,
-                  onSaved: () {
-                    ref.invalidate(tracksDataProvider);
-                  },
-                );
-              },
+              onPressed: openTrackActions,
             ),
           ],
         ),
