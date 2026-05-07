@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/http/api_client.dart';
-import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/modern_toast.dart';
 
 class LibraryToolsSheet extends ConsumerStatefulWidget {
@@ -17,6 +16,9 @@ class LibraryToolsSheet extends ConsumerStatefulWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       builder: (ctx) => LibraryToolsSheet(navContext: navContext),
     );
   }
@@ -90,9 +92,10 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surfaceElevated,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
@@ -103,16 +106,16 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '库管理工具',
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color: colorScheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -120,37 +123,35 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
           const SizedBox(height: 24),
 
           _buildToolSection(
+            context,
             icon: Icons.drive_file_rename_outline_rounded,
             title: '批量重命名',
-            description: '基于歌曲元数据（歌手 - 标题）重命名所有物理文件。',
             onTap: _isProcessing ? null : _startRename,
           ),
 
-          const Divider(height: 32, color: AppTheme.border),
+          Divider(height: 32, color: colorScheme.outlineVariant),
 
-          const Text(
+          Text(
             '整理文件层级',
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color: colorScheme.onSurface,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '按照歌手和专辑名自动创建文件夹并移动文件。',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-          ),
           const SizedBox(height: 12),
           Row(
             children: [
               _buildModernChip(
+                context,
                 '按艺术家',
                 _organizeByArtist,
                 (v) => setState(() => _organizeByArtist = v),
               ),
               const SizedBox(width: 12),
               _buildModernChip(
+                context,
                 '按专辑',
                 _organizeByAlbum,
                 (v) => setState(() => _organizeByAlbum = v),
@@ -161,26 +162,26 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
           ElevatedButton(
             onPressed: _isProcessing ? null : _startOrganize,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accent.withValues(alpha: 0.1),
-              foregroundColor: AppTheme.accent,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+              foregroundColor: colorScheme.primary,
               elevation: 0,
               minimumSize: const Size(double.infinity, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
+            child: Text(
               '开始整理库结构',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
 
-          const Divider(height: 32, color: AppTheme.border),
+          Divider(height: 32, color: colorScheme.outlineVariant),
 
           _buildToolSection(
+            context,
             icon: Icons.cleaning_services_rounded,
             title: '查找重复歌曲',
-            description: '分析曲库并聚合相同的歌曲，您可以手动选择并清理多余版本。',
             onTap: () {
               // 先关闭 sheet，再用外部（Library 页面）的 context 执行导航
               // BottomSheet 内部的 context 无法正确触发 GoRouter 跳转
@@ -193,12 +194,13 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
     );
   }
 
-  Widget _buildToolSection({
+  Widget _buildToolSection(
+    BuildContext context, {
     required IconData icon,
     required String title,
-    required String description,
     VoidCallback? onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -209,10 +211,10 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.accent.withValues(alpha: 0.1),
+                color: colorScheme.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: AppTheme.accent),
+              child: Icon(icon, color: colorScheme.primary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -221,26 +223,18 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right,
-              color: AppTheme.textSecondary,
+              color: colorScheme.onSurfaceVariant,
               size: 20,
             ),
           ],
@@ -250,26 +244,28 @@ class _LibraryToolsSheetState extends ConsumerState<LibraryToolsSheet> {
   }
 
   Widget _buildModernChip(
+    BuildContext context,
     String label,
     bool isSelected,
     Function(bool) onSelected,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
       onSelected: onSelected,
-      backgroundColor: AppTheme.surface,
-      selectedColor: AppTheme.accent.withValues(alpha: 0.2),
-      checkmarkColor: AppTheme.accent,
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      selectedColor: colorScheme.primary.withValues(alpha: 0.18),
+      checkmarkColor: colorScheme.primary,
       labelStyle: TextStyle(
-        color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
         fontSize: 13,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: isSelected ? AppTheme.accent : AppTheme.border,
+          color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
           width: 0.5,
         ),
       ),

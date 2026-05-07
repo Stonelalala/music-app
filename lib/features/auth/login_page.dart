@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
-import '../../shared/theme/app_theme.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -65,6 +64,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         BaseOptions(
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: const {'Content-Type': 'application/json'},
         ),
       );
 
@@ -111,14 +112,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppTheme.bgBase,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () {},
         ),
-        title: const Text('Server Setup'),
+        title: Text('Server Setup'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -134,34 +136,39 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   child: Container(
                     width: 100,
                     height: 100,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF12261B),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(
+                        alpha: 0.34,
+                      ),
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.waves_rounded,
-                        color: AppTheme.accent,
+                        color: colorScheme.primary,
                         size: 60,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 32),
-                const Text(
+                Text(
                   'SonicStream',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppTheme.textPrimary,
+                    color: colorScheme.onSurface,
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Connect to your private cloud library',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 48),
 
@@ -169,7 +176,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 _buildLabel('SERVER URL'),
                 TextFormField(
                   controller: _serverCtrl,
-                  style: const TextStyle(color: AppTheme.textPrimary),
+                  style: TextStyle(color: colorScheme.onSurface),
                   decoration: const InputDecoration(
                     hintText: 'https://stream.yourcloud.com',
                     prefixIcon: Icon(Icons.dns_outlined, size: 20),
@@ -187,7 +194,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 _buildLabel('USERNAME'),
                 TextFormField(
                   controller: _userCtrl,
-                  style: const TextStyle(color: AppTheme.textPrimary),
+                  style: TextStyle(color: colorScheme.onSurface),
                   decoration: const InputDecoration(
                     hintText: 'your_username',
                     prefixIcon: Icon(Icons.person_outline, size: 20),
@@ -201,15 +208,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 TextFormField(
                   controller: _passCtrl,
                   obscureText: _obscure,
-                  style: const TextStyle(color: AppTheme.textPrimary),
+                  style: TextStyle(color: colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: '••••••••',
-                    prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                    prefixIcon: Icon(Icons.lock_outline, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscure ? Icons.visibility_off : Icons.visibility,
                         size: 20,
-                        color: AppTheme.textSecondary,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
@@ -222,13 +229,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.errorColor.withValues(alpha: 0.1),
+                      color: colorScheme.errorContainer.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _error!,
-                      style: const TextStyle(
-                        color: AppTheme.errorColor,
+                      style: TextStyle(
+                        color: colorScheme.onErrorContainer,
                         fontSize: 13,
                       ),
                       textAlign: TextAlign.center,
@@ -240,30 +247,30 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ElevatedButton(
                   onPressed: _loading ? null : _login,
                   child: _loading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppTheme.bgBase,
+                            color: colorScheme.onPrimary,
                           ),
                         )
-                      : const Text('Test Connection'),
+                      : Text('Test Connection'),
                 ),
                 const SizedBox(height: 32),
                 Center(
                   child: Text.rich(
                     TextSpan(
                       text: 'Need help with setup? ',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 14,
                       ),
                       children: [
                         TextSpan(
                           text: 'View Documentation',
                           style: TextStyle(
-                            color: AppTheme.accent,
+                            color: colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -281,12 +288,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildLabel(String text) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppTheme.textSecondary,
+        style: TextStyle(
+          color: colorScheme.onSurfaceVariant,
           fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,

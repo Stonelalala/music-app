@@ -136,9 +136,9 @@ class AppTheme {
 
   static LinearGradient heroGradient(ColorScheme scheme) => LinearGradient(
     colors: [
-      scheme.primary.withValues(alpha: 0.18),
-      scheme.secondary.withValues(alpha: 0.08),
-      scheme.surfaceContainerHighest.withValues(alpha: 0.26),
+      scheme.surfaceContainerHigh.withValues(alpha: 0.98),
+      scheme.surfaceContainer.withValues(alpha: 0.94),
+      scheme.primary.withValues(alpha: 0.1),
     ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

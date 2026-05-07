@@ -66,6 +66,7 @@ class TaskItem {
       'rename': '批量重命名',
       'playlist_import': '导入歌单',
     };
+    labels['netease_daily_sync'] = '网易云日更同步';
     return labels[type] ?? type;
   }
 

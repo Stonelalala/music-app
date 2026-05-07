@@ -64,34 +64,14 @@ class DiscoveryPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 _buildHeader(context, ref, themeType),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
-                // 1. Daily Recommendations
-                Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE91E63),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '每日推荐',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                _buildSectionHeader(context, '每日推荐'),
+                const SizedBox(height: 14),
                 recommendSongsAsync.when(
-                  loading: () => _buildLoadingShimmer(height: 160),
+                  loading: () => _buildLoadingShimmer(height: 176),
                   error: (e, _) => _buildErrorState('无法加载推荐'),
                   data: (songs) {
                     return _buildDailyBanner(
@@ -132,7 +112,7 @@ class DiscoveryPage extends ConsumerWidget {
                             crossAxisCount: 3,
                             mainAxisSpacing: 12,
                             crossAxisSpacing: 12,
-                            mainAxisExtent: 160,
+                            mainAxisExtent: 154,
                           ),
                       itemCount: items.length,
                       itemBuilder: (context, index) {
@@ -165,32 +145,36 @@ class DiscoveryPage extends ConsumerWidget {
     String Function(String) proxy,
     Function(String, String) onDownload,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final now = DateTime.now();
     final day = now.day.toString().padLeft(2, '0');
     final month = _getMonthName(now.month);
 
     return GestureDetector(
-      onTap: () => _showTracksGridPopup(
-        context,
-        '每日 30 首 (Songs)',
-        songs,
-        proxy,
-        onDownload,
-      ),
+      onTap: () =>
+          _showTracksGridPopup(context, '每日 30 首', songs, proxy, onDownload),
       child: Container(
         width: double.infinity,
-        height: 160,
+        height: 134,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE91E63), Color(0xFFFF9800)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.surfaceContainerHigh.withValues(alpha: 0.94),
+              colorScheme.surfaceContainer.withValues(alpha: 0.92),
+              colorScheme.primary.withValues(alpha: 0.12),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE91E63).withValues(alpha: 0.4),
-              blurRadius: 20,
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 16,
               offset: const Offset(0, 10),
             ),
           ],
@@ -198,27 +182,45 @@ class DiscoveryPage extends ConsumerWidget {
         child: Stack(
           children: [
             Positioned(
-              right: -20,
-              bottom: -20,
+              right: -8,
+              top: -8,
+              child: Container(
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      colorScheme.primary.withValues(alpha: 0.1),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 16,
+              bottom: 16,
               child: Icon(
-                Icons.music_note_rounded,
-                size: 150,
-                color: Colors.white.withValues(alpha: 0.1),
+                Icons.multitrack_audio_rounded,
+                size: 56,
+                color: colorScheme.primary.withValues(alpha: 0.06),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Date Card
                   Container(
-                    width: 70,
-                    height: 70,
+                    width: 56,
+                    height: 68,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
+                      color: colorScheme.surface.withValues(alpha: 0.54),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.16,
+                        ),
                       ),
                     ),
                     child: Column(
@@ -226,60 +228,82 @@ class DiscoveryPage extends ConsumerWidget {
                       children: [
                         Text(
                           day,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           month,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 20),
-                  // Text Info
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          '每日 30 首 (Songs)',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '基于您的听歌喜好，为您定制的 30 首每日惊喜。',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 12,
-                          ),
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
+                            horizontal: 9,
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
+                            color: colorScheme.primary.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
-                            '30 首歌曲',
-                            style: TextStyle(color: Colors.white, fontSize: 10),
+                          child: Text(
+                            '今日推荐',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '每日 30 首',
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.play_arrow_rounded,
+                                color: colorScheme.onPrimary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              '${songs.length} 首',
+                              style: TextStyle(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -316,64 +340,115 @@ class DiscoveryPage extends ConsumerWidget {
     WidgetRef ref,
     ThemeType currentTheme,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE91E63),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.explore_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      decoration: BoxDecoration(
+        gradient: AppTheme.heroGradient(colorScheme),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.18),
         ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Text(
-            '发现与推荐',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.explore_rounded,
+              color: colorScheme.primary,
+              size: 24,
+            ),
           ),
-        ),
-        IconButton(
-          onPressed: () {
-            ref.invalidate(recommendSongsProvider);
-            ref.invalidate(recommendPlaylistsProvider);
-            ModernToast.show(context, '已刷新推荐内容', icon: Icons.refresh_rounded);
-          },
-          icon: Icon(Icons.refresh_rounded, color: colorScheme.onSurface),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '发现',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              ref.invalidate(recommendSongsProvider);
+              ref.invalidate(recommendPlaylistsProvider);
+              ModernToast.show(context, '已刷新推荐内容', icon: Icons.refresh_rounded);
+            },
+            icon: Icon(Icons.refresh_rounded, color: colorScheme.onSurface),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSectionHeader(
     BuildContext context,
     String title, {
+    String? subtitle,
     VoidCallback? onSeeAll,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        TextButton(
-          onPressed: onSeeAll,
-          child: Text(
-            '查看全部',
-            style: TextStyle(
-              color: colorScheme.primary,
-              fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ),
-      ],
+          if (onSeeAll != null)
+            TextButton.icon(
+              onPressed: onSeeAll,
+              icon: Icon(
+                Icons.grid_view_rounded,
+                size: 14,
+                color: colorScheme.primary,
+              ),
+              label: Text(
+                '查看全部',
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -383,17 +458,22 @@ class DiscoveryPage extends ConsumerWidget {
       onTap: () => MusicDownloaderSheet.show(context),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              colorScheme.primary,
-              colorScheme.primary.withValues(alpha: 0.7),
+              colorScheme.surfaceContainerHigh.withValues(alpha: 0.96),
+              colorScheme.primary.withValues(alpha: 0.14),
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+          ),
         ),
-        child: const Row(
+        child: Row(
           children: [
             Expanded(
               child: Column(
@@ -402,19 +482,35 @@ class DiscoveryPage extends ConsumerWidget {
                   Text(
                     '万能解析下载',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
+                  const SizedBox(height: 6),
                   Text(
-                    '快捷网易/QQ入库',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                    '快速把网易云、QQ 音乐内容收进本地库',
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 32),
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.rocket_launch_rounded,
+                color: colorScheme.primary,
+                size: 24,
+              ),
+            ),
           ],
         ),
       ),
@@ -525,33 +621,60 @@ class DiscoveryPage extends ConsumerWidget {
     Map<String, dynamic> playlist,
     String imageUrl,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => PlaylistDetailSheet.show(context, playlist),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.14),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.36,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.playlist_play_rounded,
+                      color: colorScheme.primary,
+                    ),
                   ),
                 ),
-                errorWidget: (context, url, error) =>
-                    const Icon(Icons.playlist_play),
               ),
             ),
           ),
           const SizedBox(height: 6),
           Text(
             playlist['name'] ?? '歌单',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -610,20 +733,19 @@ class _GridPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.85,
+          height: MediaQuery.of(context).size.height * 0.82,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.84),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.1),
-              width: 0.5,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.16),
+              width: 1,
             ),
           ),
           child: Column(
@@ -633,9 +755,7 @@ class _GridPopup extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.34),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -644,8 +764,8 @@ class _GridPopup extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w900,
+                  color: colorScheme.onSurface,
                 ),
               ),
               if (!isGrid) ...[
@@ -659,10 +779,8 @@ class _GridPopup extends StatelessWidget {
                         '精选内容',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface.withValues(alpha: 0.72),
                         ),
                       ),
                       TextButton.icon(
@@ -670,9 +788,9 @@ class _GridPopup extends StatelessWidget {
                           ModernToast.show(context, '正在解析并下载全部歌曲...');
                         },
                         style: TextButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.1),
+                          backgroundColor: colorScheme.primary.withValues(
+                            alpha: 0.12,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 8,

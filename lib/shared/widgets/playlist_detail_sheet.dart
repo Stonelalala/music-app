@@ -21,7 +21,10 @@ class PlaylistDetailSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => PlaylistDetailSheet(playlistId: playlistId),
     );
   }
@@ -89,212 +92,261 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
             ? null
             : {'Authorization': 'Bearer ${auth.token}'};
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh.withValues(
-                      alpha: 0.86,
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.surfaceContainerHigh.withValues(alpha: 0.96),
+                  colorScheme.surfaceContainer.withValues(alpha: 0.94),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.14),
+                  blurRadius: 28,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.24,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh.withValues(
+                          alpha: 0.86,
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.18,
+                          ),
+                        ),
+                      ),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _PlaylistCover(
-                            coverUrl: coverUrl,
-                            headers: coverHeaders,
-                            cacheKey: coverTrackId == null
-                                ? null
-                                : 'cover_$coverTrackId',
-                            onTap: _tracks.isEmpty || _isSaving
-                                ? null
-                                : _showCoverPicker,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  detail.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _PlaylistCover(
+                                coverUrl: coverUrl,
+                                headers: coverHeaders,
+                                cacheKey: coverTrackId == null
+                                    ? null
+                                    : 'cover_$coverTrackId',
+                                onTap: _tracks.isEmpty || _isSaving
+                                    ? null
+                                    : _showCoverPicker,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _PlaylistMetaChip(
-                                      icon: Icons.queue_music_rounded,
-                                      label: '${_tracks.length} 首歌曲',
+                                    Text(
+                                      detail.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                        color: colorScheme.onSurface,
+                                      ),
                                     ),
-                                    _PlaylistMetaChip(
-                                      icon: _customCoverTrackId == null
-                                          ? Icons.auto_awesome_rounded
-                                          : Icons.image_rounded,
-                                      label: _customCoverTrackId == null
-                                          ? '默认封面'
-                                          : '自定义封面',
-                                      highlighted: _customCoverTrackId != null,
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        _PlaylistMetaChip(
+                                          icon: Icons.queue_music_rounded,
+                                          label: '${_tracks.length} 首歌曲',
+                                        ),
+                                        _PlaylistMetaChip(
+                                          icon: _customCoverTrackId == null
+                                              ? Icons.auto_awesome_rounded
+                                              : Icons.image_rounded,
+                                          label: _customCoverTrackId == null
+                                              ? '默认封面'
+                                              : '自定义封面',
+                                          highlighted:
+                                              _customCoverTrackId != null,
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: _tracks.isEmpty || _isSaving
+                                      ? null
+                                      : () async {
+                                          await ref
+                                              .read(playerHandlerProvider)
+                                              .loadQueue(
+                                                _tracks,
+                                                startIndex: 0,
+                                              );
+                                          if (!pageContext.mounted) {
+                                            return;
+                                          }
+                                          Navigator.of(pageContext).pop();
+                                          pageContext.push('/player');
+                                        },
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: const Text('播放歌单'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _tracks.isEmpty || _isSaving
+                                      ? null
+                                      : _showCoverPicker,
+                                  icon: const Icon(Icons.image_outlined),
+                                  label: Text(
+                                    _customCoverTrackId == null
+                                        ? '设置封面'
+                                        : '更换封面',
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _tracks.isEmpty || _isSaving
-                                  ? null
-                                  : () async {
-                                      await ref
-                                          .read(playerHandlerProvider)
-                                          .loadQueue(_tracks, startIndex: 0);
-                                      if (!pageContext.mounted) {
-                                        return;
-                                      }
-                                      Navigator.of(pageContext).pop();
-                                      pageContext.push('/player');
-                                    },
-                              icon: const Icon(Icons.play_arrow_rounded),
-                              label: const Text('播放歌单'),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
+                    ),
+                    const SizedBox(height: 18),
+                    if (_tracks.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 12),
+                        child: Text(
+                          '歌单里还没有歌曲，先去加几首吧。',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                      )
+                    else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.16,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.tips_and_updates_outlined,
+                              size: 18,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '右侧拖拽手柄可排序，封面和移除操作在每首歌右侧的操作区。',
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _tracks.isEmpty || _isSaving
-                                  ? null
-                                  : _showCoverPicker,
-                              icon: const Icon(Icons.image_outlined),
-                              label: Text(
-                                _customCoverTrackId == null ? '设置封面' : '更换封面',
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Flexible(
+                        child: ReorderableListView.builder(
+                          shrinkWrap: true,
+                          buildDefaultDragHandles: false,
+                          itemCount: _tracks.length,
+                          onReorder: _isSaving
+                              ? (oldIndex, newIndex) {}
+                              : _reorderTracks,
+                          itemBuilder: (context, index) {
+                            final track = _tracks[index];
+                            final isCoverTrack =
+                                _displayCoverTrackId == track.id;
+                            return _PlaylistTrackTile(
+                              key: ValueKey('${track.id}_$index'),
+                              track: track,
+                              isCoverTrack: isCoverTrack,
+                              enabled: !_isSaving,
+                              onTap: () async {
+                                await ref
+                                    .read(playerHandlerProvider)
+                                    .loadQueue(_tracks, startIndex: index);
+                                if (!pageContext.mounted) {
+                                  return;
+                                }
+                                Navigator.of(pageContext).pop();
+                                pageContext.push('/player');
+                              },
+                              onLongPress: () =>
+                                  TrackActionSheet.show(context, ref, track),
+                              onSetCover: () => _applyCustomCover(track.id),
+                              onRemove: () => _removeTrack(track),
+                              authHeaders: coverHeaders,
+                              coverUrl:
+                                  '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
+                              dragHandle: ReorderableDragStartListener(
+                                index: index,
+                                child: Icon(
+                                  Icons.drag_handle_rounded,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                            ),
-                          ),
-                        ],
+                            );
+                          },
+                        ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                if (_tracks.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 12),
-                    child: Text(
-                      '歌单里还没有歌曲，先去加几首吧。',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant),
-                    ),
-                  )
-                else ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.16,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.tips_and_updates_outlined,
-                          size: 18,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '右侧拖拽手柄可排序，封面和移除操作在每首歌右侧的操作区。',
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Flexible(
-                    child: ReorderableListView.builder(
-                      shrinkWrap: true,
-                      buildDefaultDragHandles: false,
-                      itemCount: _tracks.length,
-                      onReorder: _isSaving
-                          ? (oldIndex, newIndex) {}
-                          : _reorderTracks,
-                      itemBuilder: (context, index) {
-                        final track = _tracks[index];
-                        final isCoverTrack = _displayCoverTrackId == track.id;
-                        return _PlaylistTrackTile(
-                          key: ValueKey('${track.id}_$index'),
-                          track: track,
-                          isCoverTrack: isCoverTrack,
-                          enabled: !_isSaving,
-                          onTap: () async {
-                            await ref
-                                .read(playerHandlerProvider)
-                                .loadQueue(_tracks, startIndex: index);
-                            if (!pageContext.mounted) {
-                              return;
-                            }
-                            Navigator.of(pageContext).pop();
-                            pageContext.push('/player');
-                          },
-                          onLongPress: () =>
-                              TrackActionSheet.show(context, ref, track),
-                          onSetCover: () => _applyCustomCover(track.id),
-                          onRemove: () => _removeTrack(track),
-                          authHeaders: coverHeaders,
-                          coverUrl:
-                              '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
-                          dragHandle: ReorderableDragStartListener(
-                            index: index,
-                            child: Icon(
-                              Icons.drag_handle_rounded,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         );
@@ -404,158 +456,177 @@ class _PlaylistDetailSheetState extends ConsumerState<PlaylistDetailSheet> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final colorScheme = Theme.of(sheetContext).colorScheme;
         final auth = ref.read(authServiceProvider);
         final headers = auth.token == null
             ? null
             : {'Authorization': 'Bearer ${auth.token}'};
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh.withValues(
-                      alpha: 0.82,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.16),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      child: Container(
+                        width: 42,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(16),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.24,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHigh.withValues(
+                          alpha: 0.82,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.16,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.14,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              Icons.wallpaper_rounded,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '选择歌单封面',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _CoverSelectionTile(
+                      title: '使用默认封面',
+                      selected: _customCoverTrackId == null,
+                      leading: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.54,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
                         ),
                         child: Icon(
-                          Icons.wallpaper_rounded,
+                          Icons.auto_awesome_rounded,
                           color: colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '选择歌单封面',
-                              style: TextStyle(
-                                color: colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '可以跟随默认首曲，也可以从歌单现有歌曲里挑一张更合适的封面。',
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 12,
-                                height: 1.45,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _CoverSelectionTile(
-                  title: '使用默认封面',
-                  subtitle: '跟随歌单当前第一首歌曲',
-                  selected: _customCoverTrackId == null,
-                  leading: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.54,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _applyCustomCover(null);
+                      },
                     ),
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: colorScheme.primary,
+                    const SizedBox(height: 16),
+                    Text(
+                      '从歌单歌曲中选择',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  onTap: () async {
-                    Navigator.of(sheetContext).pop();
-                    await _applyCustomCover(null);
-                  },
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '从歌单歌曲中选择',
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _tracks.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final track = _tracks[index];
-                      final isCurrent = _displayCoverTrackId == track.id;
-                      final coverUrl = auth.baseUrl == null
-                          ? null
-                          : '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}';
-                      return _CoverSelectionTile(
-                        title: track.title,
-                        subtitle: track.artist,
-                        selected: isCurrent,
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: coverUrl == null
-                              ? _CoverSelectionFallback(
-                                  colorScheme: colorScheme,
-                                  index: index,
-                                )
-                              : CachedNetworkImage(
-                                  imageUrl: coverUrl,
-                                  httpHeaders: headers,
-                                  cacheKey: 'cover_${track.id}',
-                                  width: 54,
-                                  height: 54,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      _CoverSelectionFallback(
-                                        colorScheme: colorScheme,
-                                        index: index,
-                                      ),
-                                ),
-                        ),
-                        trailingLabel: '第 ${index + 1} 首',
-                        onTap: () async {
-                          Navigator.of(sheetContext).pop();
-                          await _applyCustomCover(track.id);
+                    const SizedBox(height: 10),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _tracks.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final track = _tracks[index];
+                          final isCurrent = _displayCoverTrackId == track.id;
+                          final coverUrl = auth.baseUrl == null
+                              ? null
+                              : '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}';
+                          return _CoverSelectionTile(
+                            title: track.title,
+                            subtitle: track.artist,
+                            selected: isCurrent,
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: coverUrl == null
+                                  ? _CoverSelectionFallback(
+                                      colorScheme: colorScheme,
+                                      index: index,
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: coverUrl,
+                                      httpHeaders: headers,
+                                      cacheKey: 'cover_${track.id}',
+                                      width: 54,
+                                      height: 54,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) =>
+                                          _CoverSelectionFallback(
+                                            colorScheme: colorScheme,
+                                            index: index,
+                                          ),
+                                    ),
+                            ),
+                            trailingLabel: '第 ${index + 1} 首',
+                            onTap: () async {
+                              Navigator.of(sheetContext).pop();
+                              await _applyCustomCover(track.id);
+                            },
+                          );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -706,7 +777,7 @@ class _PlaylistMetaChip extends StatelessWidget {
 class _CoverSelectionTile extends StatelessWidget {
   const _CoverSelectionTile({
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.leading,
     required this.selected,
     required this.onTap,
@@ -714,7 +785,7 @@ class _CoverSelectionTile extends StatelessWidget {
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final Widget leading;
   final bool selected;
   final VoidCallback onTap;
@@ -752,16 +823,18 @@ class _CoverSelectionTile extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 12,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

@@ -5,35 +5,39 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'core/player/player_service.dart';
-import 'core/player/cache_service.dart';
+
 import 'core/auth/auth_service.dart';
+import 'core/player/cache_service.dart';
+import 'core/player/player_service.dart';
 import 'core/repositories/sync_repository.dart';
 import 'core/router/router.dart';
-import 'shared/theme/app_theme.dart';
 import 'features/settings/settings_provider.dart';
+import 'shared/theme/app_theme.dart';
+import 'shared/widgets/launch_splash_overlay.dart';
+
+Future<MusicPlayerHandler> _initializePlayerHandler() async {
+  if (kIsWeb) {
+    return MusicPlayerHandler();
+  }
+  return AudioService.init(
+    builder: MusicPlayerHandler.new,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.stonelalala.music.channel.audio',
+      androidNotificationChannelName: 'Music Playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ),
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-
-  MusicPlayerHandler handler;
-
-  if (kIsWeb) {
-    // Web 平台：直接实例化，不走 AudioService（Web 不支持后台播放）
-    handler = MusicPlayerHandler();
-  } else {
-    // Android/iOS：初始化后台播放服务
-    handler = await AudioService.init(
-      builder: MusicPlayerHandler.new,
-      config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.stonelalala.music.channel.audio',
-        androidNotificationChannelName: 'Music Playback',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
-      ),
-    );
-  }
+  final results = await Future.wait<Object>([
+    SharedPreferences.getInstance(),
+    _initializePlayerHandler(),
+  ]);
+  final prefs = results[0] as SharedPreferences;
+  final handler = results[1] as MusicPlayerHandler;
 
   runApp(
     ProviderScope(
@@ -54,7 +58,34 @@ class MusicApp extends ConsumerStatefulWidget {
 }
 
 class _MusicAppState extends ConsumerState<MusicApp> {
-  Future<void> _syncPreferencesFromServer() async {
+  bool _sessionRecoveryInFlight = false;
+  bool _showLaunchSplash = true;
+  DateTime? _lastSessionRecoveryAt;
+  final Stopwatch _launchStopwatch = Stopwatch()..start();
+
+  late final AppLifecycleListener _lifecycleListener = AppLifecycleListener(
+    onResume: () {
+      unawaited(_recoverSessionOnResume());
+    },
+  );
+
+  Future<void> _completeLaunchSplash() async {
+    const minimumSplashDuration = Duration(milliseconds: 450);
+    final remaining = minimumSplashDuration - _launchStopwatch.elapsed;
+    if (remaining > Duration.zero) {
+      await Future.delayed(remaining);
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showLaunchSplash = false;
+    });
+  }
+
+  Future<void> _syncPreferencesFromServer({
+    bool autoPlayOnRestore = false,
+  }) async {
     final auth = ref.read(authServiceProvider);
     if (!auth.isAuthenticated) {
       return;
@@ -82,47 +113,96 @@ class _MusicAppState extends ConsumerState<MusicApp> {
             .setMaxCacheSize(remoteCacheSize.toInt());
       }
 
-      await player.applyRemotePreferences(remotePreferences);
+      await player.applyRemotePreferences(
+        remotePreferences,
+        autoPlayOnRestore: autoPlayOnRestore,
+      );
     } catch (e) {
       debugPrint('Remote preference sync failed: $e');
+    }
+  }
+
+  Future<void> _recoverSessionOnResume() async {
+    final now = DateTime.now();
+    if (_sessionRecoveryInFlight) {
+      return;
+    }
+    if (_lastSessionRecoveryAt != null &&
+        now.difference(_lastSessionRecoveryAt!) < const Duration(seconds: 3)) {
+      return;
+    }
+
+    final auth = ref.read(authServiceProvider);
+    if (!auth.isAuthenticated) {
+      return;
+    }
+
+    _sessionRecoveryInFlight = true;
+    _lastSessionRecoveryAt = now;
+    try {
+      final restored = await ref
+          .read(authServiceProvider.notifier)
+          .ensureActiveSession();
+      final nextAuth = ref.read(authServiceProvider);
+      if (restored &&
+          nextAuth.isAuthenticated &&
+          nextAuth.token != null &&
+          nextAuth.baseUrl != null) {
+        ref
+            .read(playerHandlerProvider)
+            .setAuth(nextAuth.token!, nextAuth.baseUrl!);
+      }
+    } finally {
+      _sessionRecoveryInFlight = false;
     }
   }
 
   @override
   void initState() {
     super.initState();
-    // 仅在初始化时执行一次恢复
     Future.microtask(() async {
-      await ref.read(authServiceProvider.notifier).init();
-      await ref
-          .read(playerHandlerProvider)
-          .initHistoryStorage(ref.read(sharedPreferencesProvider));
-      
-      // 恢复后立即同步给播放器
-      final auth = ref.read(authServiceProvider);
-      if (auth.isAuthenticated && auth.token != null && auth.baseUrl != null) {
-        ref.read(playerHandlerProvider).setAuth(auth.token!, auth.baseUrl!);
+      final player = ref.read(playerHandlerProvider);
+      try {
+        await Future.wait<void>([
+          ref.read(authServiceProvider.notifier).init(),
+          player.initHistoryStorage(ref.read(sharedPreferencesProvider)),
+        ]);
+
+        final cacheService = ref.read(cacheServiceProvider);
+        final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
+        player.setCacheConfig(cacheService, maxBytes);
+
+        final auth = ref.read(authServiceProvider);
+        if (auth.isAuthenticated &&
+            auth.token != null &&
+            auth.baseUrl != null) {
+          player.setAuth(auth.token!, auth.baseUrl!, autoPlayOnRestore: true);
+        }
+
+        unawaited(_syncPreferencesFromServer(autoPlayOnRestore: true));
+      } finally {
+        await _completeLaunchSplash();
       }
-      
-      // 启动时初次同步缓存配置
-      final cacheService = ref.read(cacheServiceProvider);
-      final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
-      ref.read(playerHandlerProvider).setCacheConfig(cacheService, maxBytes);
-      await _syncPreferencesFromServer();
     });
   }
 
   @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 监听认证状态变化，同步给播放器
     ref.listen(authServiceProvider, (previous, next) {
       if (next.isAuthenticated && next.token != null && next.baseUrl != null) {
         ref.read(playerHandlerProvider).setAuth(next.token!, next.baseUrl!);
         Future.microtask(_syncPreferencesFromServer);
+      } else {
+        ref.read(playerHandlerProvider).clearAuth();
       }
     });
 
-    // 监听缓存设置变化，同步给播放器
     ref.listen(settingsProvider, (previous, next) {
       final cacheService = ref.read(cacheServiceProvider);
       final maxBytes = ref.read(settingsProvider.notifier).maxCacheSizeBytes;
@@ -139,7 +219,9 @@ class _MusicAppState extends ConsumerState<MusicApp> {
     ref.listen(themeTypeProvider, (previous, next) {
       if (ref.read(authServiceProvider).isAuthenticated) {
         unawaited(
-          ref.read(syncRepositoryProvider).setPreference('theme_type', next.name),
+          ref
+              .read(syncRepositoryProvider)
+              .setPreference('theme_type', next.name),
         );
       }
     });
@@ -161,6 +243,15 @@ class _MusicAppState extends ConsumerState<MusicApp> {
       themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            child ?? const SizedBox.shrink(),
+            LaunchSplashOverlay(visible: _showLaunchSplash),
+          ],
+        );
+      },
     );
   }
 }

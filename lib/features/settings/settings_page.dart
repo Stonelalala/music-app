@@ -26,7 +26,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _neteaseCookieCtrl = TextEditingController();
   final _qqCookieCtrl = TextEditingController();
-  final _cacheSectionKey = GlobalKey();
   bool _isLoading = false;
 
   @override
@@ -119,6 +118,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
         children: [
+          _buildProfileHero(
+            context,
+            auth.username ?? '访客',
+            auth.baseUrl ?? '未连接',
+          ),
+          const SizedBox(height: 24),
           _buildSectionTitle(context, '快捷入口'),
           const SizedBox(height: 12),
           _buildQuickActionsRow(context),
@@ -135,57 +140,237 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 12),
           _buildCacheSection(context, ref),
           const SizedBox(height: 28),
+          _buildSectionTitle(context, '元数据与下载'),
+          const SizedBox(height: 12),
+          _buildSurfaceCard(
+            context,
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCookieField(
+                  context,
+                  '网易云 Cookie',
+                  _neteaseCookieCtrl,
+                  '用于获取推荐和下载',
+                ),
+                const SizedBox(height: 16),
+                _buildCookieField(
+                  context,
+                  'QQ 音乐 Cookie',
+                  _qqCookieCtrl,
+                  '用于解析 QQ 音乐链接',
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _saveConfig,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: const Text('保存所有配置'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+          _buildSectionTitle(context, '数据备份'),
+          const SizedBox(height: 12),
+          _buildBackupSection(context, ref),
+          const SizedBox(height: 28),
           _buildSectionTitle(context, '账户信息'),
           const SizedBox(height: 12),
           _buildInfoTile(context, '当前用户', auth.username ?? '访客'),
           _buildInfoTile(context, '服务器地址', auth.baseUrl ?? '未连接'),
           const SizedBox(height: 28),
-          _buildSectionTitle(context, '元数据与下载'),
-          const SizedBox(height: 12),
-          _buildCookieField(
-            context,
-            '网易云 Cookie',
-            _neteaseCookieCtrl,
-            '用于获取每日推荐与下载',
-          ),
-          const SizedBox(height: 16),
-          _buildCookieField(
-            context,
-            'QQ 音乐 Cookie',
-            _qqCookieCtrl,
-            '用于解析 QQ 音乐链接',
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _isLoading ? null : _saveConfig,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-            ),
-            child: const Text('保存所有配置'),
-          ),
-          const SizedBox(height: 36),
-          _buildSectionTitle(context, '数据备份'),
-          const SizedBox(height: 12),
-          _buildBackupSection(context, ref),
-          const SizedBox(height: 28),
           _buildSectionTitle(context, '危险区域'),
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => ref.read(authServiceProvider.notifier).logout(),
-            style: TextButton.styleFrom(
-              foregroundColor: colorScheme.error,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: const Text(
-              '退出当前账号',
-              style: TextStyle(fontWeight: FontWeight.bold),
+          _buildSurfaceCard(
+            context,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: TextButton(
+              onPressed: () => ref.read(authServiceProvider.notifier).logout(),
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.error,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text(
+                '退出当前账号',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileHero(
+    BuildContext context,
+    String username,
+    String server,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: AppTheme.heroGradient(colorScheme),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.10),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.person_rounded,
+                  color: colorScheme.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '个人音乐中心',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildHeroTag(
+                context,
+                icon: Icons.cloud_done_rounded,
+                text: server,
+              ),
+              _buildHeroTag(
+                context,
+                icon: Icons.palette_outlined,
+                text: '主题与快捷入口',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroTag(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.30),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSurfaceCard(
+    BuildContext context, {
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.all(16),
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surfaceContainerHigh.withValues(alpha: 0.88),
+            colorScheme.surfaceContainer.withValues(alpha: 0.78),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 
@@ -265,14 +450,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.24),
-          borderRadius: BorderRadius.circular(22),
-        ),
+      borderRadius: BorderRadius.circular(24),
+      child: _buildSurfaceCard(
+        context,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 42,
@@ -281,13 +464,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 color: color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, size: 22, color: color),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 21, color: color),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Text(
               label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -301,24 +488,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return smartAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text('加载智能歌单失败: $error'),
-      ),
+      error: (error, _) =>
+          _buildSurfaceCard(context, child: Text('加载智能歌单失败: $error')),
       data: (playlists) {
         if (playlists.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.16,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
+          return _buildSurfaceCard(
+            context,
             child: Text(
               '当前还没有可用的智能歌单',
               style: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -326,69 +501,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           );
         }
 
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+        return Column(
           children: playlists.map((playlist) {
-            return SizedBox(
-              width: (MediaQuery.of(context).size.width - 52) / 2,
+            final icon = switch (playlist.id) {
+              'smart:most-played' => Icons.graphic_eq_rounded,
+              'smart:recent-added' => Icons.schedule_rounded,
+              _ => Icons.explore_rounded,
+            };
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
               child: InkWell(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 onTap: () =>
                     _showSmartPlaylistDetail(context, ref, playlist.id),
-                child: Container(
+                child: _buildSurfaceCard(
+                  context,
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.surfaceContainerHigh.withValues(
-                          alpha: 0.92,
-                        ),
-                        colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.82,
-                        ),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.16),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
                       Container(
-                        width: 42,
-                        height: 42,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Icon(switch (playlist.id) {
-                          'smart:most-played' => Icons.graphic_eq_rounded,
-                          'smart:recent-added' => Icons.schedule_rounded,
-                          _ => Icons.explore_rounded,
-                        }, color: colorScheme.primary),
+                        alignment: Alignment.center,
+                        child: Icon(icon, color: colorScheme.primary),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        playlist.name,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              playlist.name,
+                              style: TextStyle(
+                                color: colorScheme.onSurface,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              playlist.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        playlist.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ],
                   ),
@@ -404,18 +574,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildBackupSection(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return _buildSurfaceCard(
+      context,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '可导出收藏、歌单与最近播放，也支持把备份 JSON 再导回当前账号。',
-            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4),
+            '可导出收藏、歌单与最近播放，也支持将 JSON 备份再导入当前账号。',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.45),
           ),
           const SizedBox(height: 16),
           Row(
@@ -847,25 +1014,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             width: itemWidth.clamp(140.0, 220.0),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? colorScheme.primaryContainer.withValues(alpha: 0.24)
-                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+              gradient: LinearGradient(
+                colors: [
+                  isSelected
+                      ? colorScheme.primaryContainer.withValues(alpha: 0.28)
+                      : colorScheme.surfaceContainerHigh.withValues(
+                          alpha: 0.82,
+                        ),
+                  isSelected
+                      ? colorScheme.primary.withValues(alpha: 0.08)
+                      : colorScheme.surfaceContainer.withValues(alpha: 0.74),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.outlineVariant.withValues(alpha: 0.24),
-                width: isSelected ? 1.8 : 1,
+                    ? colorScheme.primary.withValues(alpha: 0.72)
+                    : colorScheme.outlineVariant.withValues(alpha: 0.20),
+                width: isSelected ? 1.6 : 1,
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 18,
-                  height: 18,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
                     color: theme.primaryColor,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.primaryColor.withValues(alpha: 0.28),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -875,10 +1060,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
+                      color: colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
+                          ? FontWeight.w800
+                          : FontWeight.w600,
                     ),
                   ),
                 ),
@@ -900,28 +1086,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.watch(settingsProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      key: _cacheSectionKey,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(24),
-      ),
+    return _buildSurfaceCard(
+      context,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '最大缓存空间',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               Text(
                 '${settings.maxCacheSizeMB} MB',
                 style: TextStyle(
                   color: colorScheme.primary,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -937,7 +1123,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ref.read(settingsProvider.notifier).setMaxCacheSize(val.round());
             },
           ),
-          const Divider(height: 32),
+          const SizedBox(height: 8),
           Consumer(
             builder: (context, ref, child) {
               final cachedAsync = ref.watch(cachedTracksProvider);
@@ -952,60 +1138,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       final sizeDisplay = (totalSize / (1024 * 1024))
                           .toStringAsFixed(1);
                       return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '当前占用',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    '$sizeDisplay MB',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                    ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '当前占用',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  const SizedBox(width: 12),
-                                  GestureDetector(
-                                    onTap: () =>
-                                        _showCachedTracks(context, ref),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.primary.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: colorScheme.primary.withValues(
-                                            alpha: 0.2,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '查看详情',
-                                        style: TextStyle(
-                                          color: colorScheme.primary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '$sizeDisplay MB',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _showCachedTracks(context, ref),
+                                  icon: const Icon(Icons.folder_open_rounded),
+                                  label: const Text('查看详情'),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    foregroundColor: colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          TextButton.icon(
+                          const SizedBox(width: 12),
+                          OutlinedButton.icon(
                             onPressed: () async {
                               await ref
                                   .read(cacheServiceProvider)
@@ -1020,7 +1190,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             },
                             icon: const Icon(Icons.delete_sweep_rounded),
                             label: const Text('清理缓存'),
-                            style: TextButton.styleFrom(
+                            style: OutlinedButton.styleFrom(
                               foregroundColor: colorScheme.error,
                             ),
                           ),
@@ -1038,45 +1208,49 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Text(
       title,
       style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
+        color: colorScheme.onSurface,
+        fontSize: 22,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -0.5,
       ),
     );
   }
 
   Widget _buildInfoTile(BuildContext context, String label, String value) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 13,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _buildSurfaceCard(
+        context,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 92,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1093,7 +1267,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -1103,9 +1281,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.16,
-            ),
+            fillColor: colorScheme.surface.withValues(alpha: 0.34),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
               borderSide: BorderSide.none,
@@ -1122,6 +1298,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.62,
         maxChildSize: 0.82,

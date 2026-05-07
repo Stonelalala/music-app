@@ -19,7 +19,9 @@ class TrackEditSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -188,6 +190,9 @@ class _TrackEditSheetState extends ConsumerState<TrackEditSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),

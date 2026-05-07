@@ -14,11 +14,15 @@ import '../../features/library/duplicate_cleaning_page.dart';
 import '../../features/search/search_page.dart';
 import '../../features/search/network_search_page.dart';
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _shellNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   // 注意：不再在这里 ref.watch(authServiceProvider)，否则会导致 GoRouter 实例反复重建
   // 我们使用 refreshListenable 来让 GoRouter 响应状态变化
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/home',
     // 使用通知器作为刷新信号
     refreshListenable: _RouterRefreshStream(ref),
@@ -35,7 +39,9 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       ShellRoute(
-        builder: (context, state, child) => MainShell(child: child),
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) =>
+            MainShell(currentLocation: state.matchedLocation, child: child),
         routes: [
           GoRoute(path: '/home', builder: (context, state) => const HomePage()),
           GoRoute(
@@ -46,12 +52,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/discovery',
             builder: (context, state) => const DiscoveryPage(),
           ),
-          GoRoute(path: '/my', builder: (context, state) => const SettingsPage()),
+          GoRoute(
+            path: '/my',
+            builder: (context, state) => const SettingsPage(),
+          ),
         ],
       ),
-      GoRoute(path: '/tasks', builder: (context, state) => const TasksPage()),
+      GoRoute(
+        path: '/tasks',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const TasksPage(),
+      ),
       GoRoute(
         path: '/player',
+        parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const PlayerPage(),
@@ -70,18 +84,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/library/duplicates',
+        parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const DuplicateCleaningPage(),
       ),
       GoRoute(
         path: '/search',
+        parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SearchPage(),
       ),
       GoRoute(
         path: '/network-search',
+        parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const NetworkSearchPage(),
       ),
       GoRoute(
         path: '/settings',
+        parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SettingsPage(),
       ),
     ],

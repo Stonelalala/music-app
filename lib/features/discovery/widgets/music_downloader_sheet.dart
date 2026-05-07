@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/http/api_client.dart';
-import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/modern_toast.dart';
 
 class MusicDownloaderSheet extends ConsumerStatefulWidget {
@@ -11,6 +10,9 @@ class MusicDownloaderSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -132,9 +134,10 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surfaceElevated,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -145,16 +148,16 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '音乐下载器',
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color: colorScheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -163,15 +166,15 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
 
           TextField(
             controller: _urlCtrl,
-            style: const TextStyle(color: AppTheme.textPrimary),
+            style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: '粘贴网易云或QQ音乐链接...',
-              hintStyle: const TextStyle(
-                color: AppTheme.textSecondary,
+              hintStyle: TextStyle(
+                color: colorScheme.onSurfaceVariant,
                 fontSize: 14,
               ),
               filled: true,
-              fillColor: AppTheme.surface,
+              fillColor: colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -182,7 +185,7 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : IconButton(
-                      icon: const Icon(Icons.bolt, color: AppTheme.accent),
+                      icon: Icon(Icons.bolt, color: colorScheme.primary),
                       onPressed: _parseUrl,
                     ),
             ),
@@ -203,11 +206,8 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                     errorBuilder: (context, error, stackTrace) => Container(
                       width: 80,
                       height: 80,
-                      color: AppTheme.surface,
-                      child: const Icon(
-                        Icons.music_note,
-                        color: AppTheme.accent,
-                      ),
+                      color: colorScheme.surfaceContainerHighest,
+                      child: Icon(Icons.music_note, color: colorScheme.primary),
                     ),
                   ),
                 ),
@@ -218,8 +218,8 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                     children: [
                       Text(
                         _parsedData!['title'] ?? '未知标题',
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -229,8 +229,8 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                       const SizedBox(height: 4),
                       Text(
                         _parsedData!['artist'] ?? '未知艺术家',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),
@@ -240,10 +240,10 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
               ],
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               '选择下载音质',
               style: TextStyle(
-                color: AppTheme.textSecondary,
+                color: colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -260,18 +260,20 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
                   onSelected: (val) {
                     if (val) setState(() => _selectedLevel = lvl['id']!);
                   },
-                  backgroundColor: AppTheme.surface,
-                  selectedColor: AppTheme.accent.withValues(alpha: 0.2),
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  selectedColor: colorScheme.primary.withValues(alpha: 0.18),
                   labelStyle: TextStyle(
                     color: isSelected
-                        ? AppTheme.accent
-                        : AppTheme.textSecondary,
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: isSelected ? AppTheme.accent : AppTheme.border,
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
                       width: 0.5,
                     ),
                   ),
@@ -283,16 +285,16 @@ class _MusicDownloaderSheetState extends ConsumerState<MusicDownloaderSheet> {
             ElevatedButton(
               onPressed: _isDownloading ? null : _startDownload,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accent,
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
                 minimumSize: const Size(double.infinity, 54),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: _isDownloading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
+                  ? CircularProgressIndicator(color: colorScheme.onPrimary)
+                  : Text(
                       '开始下载并加入库',
                       style: TextStyle(
                         fontSize: 16,

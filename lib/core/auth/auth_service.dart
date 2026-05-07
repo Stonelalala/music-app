@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -41,6 +44,20 @@ class AuthService extends StateNotifier<AuthState> {
 
   AuthService() : super(const AuthState());
 
+  Dio _buildAuthDio(String baseUrl, {String? token}) {
+    return Dio(
+      BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+  }
+
   /// 初始化：从存储中恢复 token 和 baseUrl
   Future<void> init() async {
     final token = await _storage.read(key: _kToken);
@@ -54,6 +71,10 @@ class AuthService extends StateNotifier<AuthState> {
       password: password,
       isAuthenticated: token != null,
     );
+
+    if (token != null && baseUrl != null) {
+      await ensureActiveSession();
+    }
   }
 
   /// 保存登录结果
@@ -79,7 +100,83 @@ class AuthService extends StateNotifier<AuthState> {
   /// 退出登录
   Future<void> logout() async {
     await _storage.delete(key: _kToken);
-    state = state.copyWith(token: null, isAuthenticated: false);
+    state = AuthState(
+      baseUrl: state.baseUrl,
+      username: state.username,
+      password: state.password,
+      isAuthenticated: false,
+    );
+  }
+
+  Future<bool> ensureActiveSession() async {
+    final token = state.token ?? await _storage.read(key: _kToken);
+    final baseUrl = state.baseUrl ?? await _storage.read(key: _kBaseUrl);
+    if (token == null || baseUrl == null) {
+      return false;
+    }
+
+    try {
+      await _buildAuthDio(baseUrl, token: token).get('/api/auth/check');
+      if (state.token != token ||
+          state.baseUrl != baseUrl ||
+          !state.isAuthenticated) {
+        state = state.copyWith(
+          token: token,
+          baseUrl: baseUrl,
+          isAuthenticated: true,
+        );
+      }
+      return true;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
+        final refreshedToken = await reauthenticateIfPossible();
+        if (refreshedToken != null) {
+          return true;
+        }
+        await logout();
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> reauthenticateIfPossible() async {
+    final baseUrl = state.baseUrl ?? await _storage.read(key: _kBaseUrl);
+    final username = state.username ?? await _storage.read(key: _kUsername);
+    final password = state.password ?? await _storage.read(key: _kPassword);
+
+    if (baseUrl == null ||
+        username == null ||
+        username.isEmpty ||
+        password == null ||
+        password.isEmpty) {
+      return null;
+    }
+
+    try {
+      final response = await _buildAuthDio(baseUrl).post(
+        '/api/auth/login',
+        data: {'username': username, 'password': password},
+      );
+
+      final token = response.data['token'] as String?;
+      final serverUsername =
+          response.data['user']?['username'] as String? ?? username;
+      if (token == null || token.isEmpty) {
+        return null;
+      }
+
+      await saveLogin(
+        token: token,
+        baseUrl: baseUrl,
+        username: serverUsername,
+        password: password,
+      );
+      return token;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String?> getToken() async => _storage.read(key: _kToken);

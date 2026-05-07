@@ -17,6 +17,7 @@ import '../library/widgets/track_edit_sheet.dart';
 import '../../core/repositories/track_repository.dart';
 import '../../shared/widgets/modern_toast.dart';
 import '../my/collection_providers.dart';
+import 'equalizer_page.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key});
@@ -102,9 +103,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     await _fetchLyrics(track.id);
   }
 
-  Future<void> _fetchLyrics(String trackId) async {
-    final handler = ref.read(playerHandlerProvider);
-    final lyrics = await handler.getLyrics(trackId);
+  void _applyLyrics(String trackId, String? lyrics) {
     if (!mounted || trackId != _lastTrackId) {
       return;
     }
@@ -118,6 +117,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       return;
     }
 
+    final handler = ref.read(playerHandlerProvider);
     setState(() {
       _rawLyrics = lyrics;
       _parsedLyrics = _parseLrc(
@@ -127,6 +127,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       _currentLyricIndex = -1;
     });
     _scheduleLyricResync(immediate: true);
+  }
+
+  Future<void> _fetchLyrics(String trackId) async {
+    final handler = ref.read(playerHandlerProvider);
+    final cachedLyrics = handler.cachedLyricsForTrack(trackId);
+    if (cachedLyrics != null && cachedLyrics.trim().isNotEmpty) {
+      _applyLyrics(trackId, cachedLyrics);
+      return;
+    }
+
+    final lyrics = await handler.getLyrics(trackId);
+    _applyLyrics(trackId, lyrics);
   }
 
   int _findLyricIndex(Duration pos) {
@@ -226,6 +238,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      final track = ref.read(playerHandlerProvider).currentTrack;
+      if (track != null && _parsedLyrics.isEmpty) {
+        unawaited(_fetchLyrics(track.id));
+      }
       _scheduleLyricResync(immediate: true);
     }
   }
@@ -312,6 +328,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 }
               } else if (value == 'lyrics') {
                 _showLyricsToolsSheet(track);
+              } else if (value == 'equalizer') {
+                _showEqualizerSheet();
               } else if (value == 'delete') {
                 _confirmDelete(context);
               }
@@ -328,6 +346,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     ),
                     const SizedBox(width: 12),
                     const Text('编辑曲目信息'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'equalizer',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.graphic_eq_rounded,
+                      size: 22,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('调音'),
                   ],
                 ),
               ),
@@ -536,25 +568,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     return AnimatedBuilder(
       animation: _rotationController,
       builder: (context, child) {
+        final coverSize = size * 0.72;
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Outer Glow
             Container(
-              width: size + 20,
-              height: size + 20,
+              width: size + 28,
+              height: size + 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.2),
-                    blurRadius: 60,
-                    spreadRadius: 10,
-                  ),
-                ],
+                gradient: RadialGradient(
+                  colors: [
+                    accentColor.withValues(alpha: 0.14),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-            // The Disk
             Transform.rotate(
               angle: _rotationController.value * 2 * pi,
               child: Container(
@@ -562,48 +592,107 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 height: size,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black,
-                  border: Border.all(
-                    color: colorScheme.onSurface.withValues(alpha: 0.1),
-                    width: 2,
+                  gradient: RadialGradient(
+                    colors: [
+                      colorScheme.surfaceContainerHigh,
+                      colorScheme.surface.withValues(alpha: 0.98),
+                      Colors.black,
+                    ],
+                    stops: const [0.0, 0.48, 1.0],
                   ),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.32),
+                      blurRadius: 28,
+                      offset: const Offset(0, 18),
+                    ),
+                  ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: ClipOval(
-                    child: CachedNetworkImage(
-                      imageUrl:
-                          '$baseUrl/api/tracks/${track.id}/cover?auth=$token',
-                      cacheKey: 'cover_${track.id}',
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          Icons.music_note_rounded,
-                          color: colorScheme.primary,
-                          size: size * 0.28,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: size * 0.88,
+                      height: size * 0.88,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.onSurface.withValues(alpha: 0.06),
                         ),
                       ),
                     ),
-                  ),
+                    Container(
+                      width: size * 0.58,
+                      height: size * 0.58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.onSurface.withValues(alpha: 0.05),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: coverSize + 18,
+                      height: coverSize + 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: coverSize,
+                      height: coverSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.onSurface.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              '$baseUrl/api/tracks/${track.id}/cover?auth=$token',
+                          cacheKey: 'cover_${track.id}',
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.music_note_rounded,
+                              color: colorScheme.primary,
+                              size: size * 0.22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            // Center Pin
             Container(
-              width: size * 0.18,
-              height: size * 0.18,
+              width: size * 0.2,
+              height: size * 0.2,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: colorScheme.surface,
+                color: colorScheme.surfaceContainer,
                 border: Border.all(
-                  color: colorScheme.onSurface.withValues(alpha: 0.2),
-                  width: 1.5,
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.26),
+                  width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: accentColor.withValues(alpha: 0.5),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
@@ -612,7 +701,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   width: size * 0.05,
                   height: size * 0.05,
                   decoration: BoxDecoration(
-                    color: accentColor,
+                    color: colorScheme.onSurface,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -631,40 +720,62 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     ColorScheme colorScheme,
     bool isSmall,
   ) {
+    Widget modeButton({
+      required IconData icon,
+      required VoidCallback onTap,
+      required bool active,
+    }) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: active
+                ? colorScheme.primary.withValues(alpha: 0.16)
+                : colorScheme.surfaceContainerHigh.withValues(alpha: 0.44),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            size: 19,
+          ),
+        ),
+      );
+    }
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(32),
+        color: colorScheme.surfaceContainer.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: colorScheme.onSurface.withValues(alpha: 0.08),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.14),
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(30),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 20.0,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Progress Bar
                 StreamBuilder<Duration>(
                   stream: handler.player.positionStream,
                   builder: (context, snap) {
                     final pos = snap.data ?? Duration.zero;
                     final dur = Duration(seconds: track.duration.toInt());
-
-                    // 如果正在拖动，使用拖动时的值，否则使用播放器当前进度
                     final currentSeconds =
                         _draggingValue ?? pos.inSeconds.toDouble();
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: Row(
                         children: [
                           Text(
@@ -673,10 +784,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             ),
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.8,
+                                alpha: 0.82,
                               ),
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                               fontFeatures: const [
                                 FontFeature.tabularFigures(),
                               ],
@@ -685,7 +796,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                           Expanded(
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
-                                trackHeight: 3,
+                                trackHeight: 3.5,
                                 thumbShape: const RoundSliderThumbShape(
                                   enabledThumbRadius: 6,
                                 ),
@@ -695,7 +806,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 overlayShape: const RoundSliderOverlayShape(
                                   overlayRadius: 16,
                                 ),
-                                // 移除 Slider 内部的边距，使其与文字贴合更紧密
                                 trackShape: const RoundedRectSliderTrackShape(),
                               ),
                               child: Slider(
@@ -731,10 +841,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             _formatDuration(dur),
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.8,
+                                alpha: 0.82,
                               ),
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                               fontFeatures: const [
                                 FontFeature.tabularFigures(),
                               ],
@@ -745,31 +855,30 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     );
                   },
                 ),
-                const SizedBox(height: 20),
-                // Main Controls
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     StreamBuilder<bool>(
                       stream: handler.player.shuffleModeEnabledStream,
-                      builder: (context, snap) => IconButton(
-                        icon: Icon(
-                          Icons.shuffle,
-                          color: (snap.data ?? false)
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                          size: 22,
-                        ),
-                        onPressed: () => handler.toggleShuffle(),
+                      builder: (context, snap) => modeButton(
+                        icon: Icons.shuffle_rounded,
+                        active: snap.data ?? false,
+                        onTap: () => handler.toggleShuffle(),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.skip_previous_rounded,
-                        color: colorScheme.onSurface,
-                        size: 36,
+                    InkWell(
+                      onTap: () => handler.skipToPrevious(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(
+                          Icons.skip_previous_rounded,
+                          color: colorScheme.onSurface,
+                          size: 34,
+                        ),
                       ),
-                      onPressed: () => handler.skipToPrevious(),
                     ),
                     StreamBuilder<PlayerState>(
                       stream: handler.player.playerStateStream,
@@ -777,8 +886,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         final playerState = snapshot.data;
                         final processingState = playerState?.processingState;
                         final playing = playerState?.playing ?? false;
-
-                        // 是否处于加载或缓冲状态
                         final isLoading =
                             processingState == ProcessingState.buffering ||
                             processingState == ProcessingState.loading;
@@ -786,12 +893,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         return Stack(
                           alignment: Alignment.center,
                           children: [
-                            // 固定 72x72 的空间，防止加载环出现/消失时 UI 整体发生位移
                             SizedBox(
                               width: 72,
                               height: 72,
                               child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 300),
+                                duration: const Duration(milliseconds: 250),
                                 opacity: isLoading ? 1.0 : 0.0,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
@@ -804,7 +910,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                               onTap: () =>
                                   playing ? handler.pause() : handler.play(),
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
+                                duration: const Duration(milliseconds: 220),
                                 width: 64,
                                 height: 64,
                                 decoration: BoxDecoration(
@@ -813,9 +919,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                   boxShadow: [
                                     BoxShadow(
                                       color: colorScheme.primary.withValues(
-                                        alpha: 0.4,
+                                        alpha: 0.26,
                                       ),
-                                      blurRadius: 16,
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 8),
                                     ),
                                   ],
                                 ),
@@ -824,7 +931,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                       ? Icons.pause_rounded
                                       : Icons.play_arrow_rounded,
                                   color: colorScheme.onPrimary,
-                                  size: 36,
+                                  size: 34,
                                 ),
                               ),
                             ),
@@ -832,29 +939,29 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         );
                       },
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.skip_next_rounded,
-                        color: colorScheme.onSurface,
-                        size: 36,
+                    InkWell(
+                      onTap: () => handler.skipToNext(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(
+                          Icons.skip_next_rounded,
+                          color: colorScheme.onSurface,
+                          size: 34,
+                        ),
                       ),
-                      onPressed: () => handler.skipToNext(),
                     ),
                     StreamBuilder<LoopMode>(
                       stream: handler.player.loopModeStream,
                       builder: (context, snap) {
                         final mode = snap.data ?? LoopMode.off;
-                        return IconButton(
-                          icon: Icon(
-                            mode == LoopMode.one
-                                ? Icons.repeat_one
-                                : Icons.repeat,
-                            color: mode != LoopMode.off
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
-                            size: 22,
-                          ),
-                          onPressed: () => handler.toggleLoopMode(),
+                        return modeButton(
+                          icon: mode == LoopMode.one
+                              ? Icons.repeat_one_rounded
+                              : Icons.repeat_rounded,
+                          active: mode != LoopMode.off,
+                          onTap: () => handler.toggleLoopMode(),
                         );
                       },
                     ),
@@ -870,7 +977,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         onTap: () => _showAddToPlaylistSheet(track),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Consumer(
                         builder: (context, ref, child) {
@@ -901,7 +1008,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         },
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildBottomActionButton(
                         context,
@@ -909,7 +1016,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         onTap: _showSleepTimerSheet,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildBottomActionButton(
                         context,
@@ -1253,36 +1360,32 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        height: 46,
         decoration: BoxDecoration(
           color: highlighted
               ? colorScheme.primary.withValues(alpha: 0.16)
               : colorScheme.surfaceContainerHigh.withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: highlighted
               ? [
                   BoxShadow(
                     color: colorScheme.primary.withValues(alpha: 0.18),
-                    blurRadius: 14,
-                    offset: const Offset(0, 8),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
                 ]
               : null,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: highlighted
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant,
-            ),
-          ],
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 18,
+          color: highlighted
+              ? colorScheme.primary
+              : colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -1316,6 +1419,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         ModernToast.show(context, '收藏操作失败: $e', isError: true);
       }
     }
+  }
+
+  Future<void> _showEqualizerSheet() async {
+    final handler = ref.read(playerHandlerProvider);
+    if (!handler.supportsEqualizer) {
+      if (mounted) {
+        ModernToast.show(context, '当前设备暂不支持调音', isError: true);
+      }
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const EqualizerPage()));
   }
 
   Future<void> _showAddToPlaylistSheet(Track track) async {

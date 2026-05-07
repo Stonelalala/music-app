@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/http/api_client.dart';
 import '../../shared/models/task.dart';
-import '../../shared/theme/app_theme.dart';
 
 final tasksListProvider = StreamProvider.autoDispose<List<TaskItem>>((
   ref,
@@ -50,9 +49,10 @@ class _TasksPageState extends ConsumerState<TasksPage> {
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(tasksListProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: AppTheme.bgBase,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('任务中心'),
         actions: [
@@ -76,7 +76,7 @@ class _TasksPageState extends ConsumerState<TasksPage> {
         error: (error, _) => Center(
           child: Text(
             '加载失败: $error',
-            style: const TextStyle(color: AppTheme.textSecondary),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
           ),
         ),
         data: (tasks) {
@@ -89,26 +89,28 @@ class _TasksPageState extends ConsumerState<TasksPage> {
               ),
               Expanded(
                 child: filteredTasks.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.task_alt_rounded,
-                              color: AppTheme.textSecondary,
+                              color: colorScheme.onSurfaceVariant,
                               size: 48,
                             ),
-                            SizedBox(height: 12),
+                            const SizedBox(height: 12),
                             Text(
                               '暂无任务',
-                              style: TextStyle(color: AppTheme.textSecondary),
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
                       )
                     : RefreshIndicator(
-                        color: AppTheme.accent,
-                        backgroundColor: AppTheme.surface,
+                        color: colorScheme.primary,
+                        backgroundColor: colorScheme.surface,
                         onRefresh: () async =>
                             ref.invalidate(tasksListProvider),
                         child: ListView.separated(
@@ -210,30 +212,36 @@ class _TaskCard extends ConsumerWidget {
   final TaskItem task;
   final VoidCallback onChanged;
 
-  Color get _statusColor {
+  Color _statusColor(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (task.isCompleted) {
-      return AppTheme.successColor;
+      return colorScheme.primary;
     }
     if (task.isFailed) {
-      return AppTheme.errorColor;
+      return colorScheme.error;
     }
     if (task.isCancelled) {
-      return AppTheme.textSecondary;
+      return colorScheme.onSurfaceVariant;
     }
-    return AppTheme.accent;
+    return colorScheme.primary;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final statusColor = _statusColor(context);
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () => _showTaskDetails(context),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceElevated,
+          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.82),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.border, width: 0.5),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+            width: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,13 +254,13 @@ class _TaskCard extends ConsumerWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: _statusColor.withValues(alpha: 0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     task.typeLabel,
                     style: TextStyle(
-                      color: _statusColor,
+                      color: statusColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -263,7 +271,7 @@ class _TaskCard extends ConsumerWidget {
                 const Spacer(),
                 Text(
                   task.statusLabel,
-                  style: TextStyle(color: _statusColor, fontSize: 12),
+                  style: TextStyle(color: statusColor, fontSize: 12),
                 ),
                 if (task.isRunning) ...[
                   const SizedBox(width: 6),
@@ -272,7 +280,7 @@ class _TaskCard extends ConsumerWidget {
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: _statusColor,
+                      color: statusColor,
                     ),
                   ),
                 ],
@@ -282,8 +290,8 @@ class _TaskCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 task.message!,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
                   fontSize: 13,
                 ),
                 maxLines: 3,
@@ -294,15 +302,17 @@ class _TaskCard extends ConsumerWidget {
               const SizedBox(height: 10),
               LinearProgressIndicator(
                 value: task.progress / 100,
-                backgroundColor: AppTheme.border,
-                color: AppTheme.accent,
+                backgroundColor: colorScheme.outlineVariant.withValues(
+                  alpha: 0.24,
+                ),
+                color: colorScheme.primary,
                 borderRadius: BorderRadius.circular(4),
               ),
               const SizedBox(height: 4),
               Text(
                 '${task.progress.toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
@@ -345,7 +355,7 @@ class _TaskCard extends ConsumerWidget {
                   _MiniActionButton(
                     icon: Icons.close_rounded,
                     label: '取消',
-                    foregroundColor: AppTheme.errorColor,
+                    foregroundColor: colorScheme.error,
                     onTap: () async {
                       await ref
                           .read(apiClientProvider)
@@ -372,6 +382,8 @@ class _TaskCard extends ConsumerWidget {
   }
 
   Future<void> _showTaskDetails(BuildContext context) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final statusColor = _statusColor(context);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -382,7 +394,7 @@ class _TaskCard extends ConsumerWidget {
         maxChildSize: 0.9,
         minChildSize: 0.45,
         builder: (context, controller) => Container(
-          color: AppTheme.surface,
+          color: colorScheme.surface,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +417,7 @@ class _TaskCard extends ConsumerWidget {
               Text(
                 task.statusLabel,
                 style: TextStyle(
-                  color: _statusColor,
+                  color: statusColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -413,7 +425,7 @@ class _TaskCard extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text(
                   task.message!,
-                  style: const TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 16),
@@ -427,9 +439,12 @@ class _TaskCard extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceElevated,
+                    color: colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.border, width: 0.5),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+                      width: 0.5,
+                    ),
                   ),
                   child: SingleChildScrollView(
                     controller: controller,
@@ -437,8 +452,8 @@ class _TaskCard extends ConsumerWidget {
                       task.logs?.trim().isNotEmpty == true
                           ? task.logs!.trim()
                           : '暂无日志',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
                         height: 1.5,
                       ),
                     ),
@@ -460,13 +475,14 @@ class _PriorityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isHigh = priority > 0;
     final isLow = priority < 0;
     final color = isHigh
-        ? AppTheme.accent
+        ? colorScheme.primary
         : isLow
-        ? AppTheme.textSecondary
-        : AppTheme.textPrimary;
+        ? colorScheme.onSurfaceVariant
+        : colorScheme.onSurface;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -501,7 +517,7 @@ class _MiniActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = foregroundColor ?? AppTheme.textPrimary;
+    final color = foregroundColor ?? Theme.of(context).colorScheme.onSurface;
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 16),

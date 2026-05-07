@@ -5,8 +5,8 @@ import '../../core/auth/auth_service.dart';
 import '../../core/player/player_service.dart';
 import '../../core/repositories/collection_repository.dart';
 import '../../core/repositories/track_repository.dart';
-import '../../features/library/library_page.dart';
 import '../my/collection_providers.dart';
+import '../../shared/models/discovery_album.dart';
 import '../../shared/models/track.dart';
 import '../../shared/models/playlist.dart';
 import 'package:go_router/go_router.dart';
@@ -16,26 +16,21 @@ import '../../shared/widgets/modern_toast.dart';
 import '../../shared/widgets/playlist_detail_sheet.dart';
 import '../../shared/widgets/track_action_sheet.dart';
 
-final randomSongsProvider = FutureProvider.autoDispose<List<Track>>((
-  ref,
-) async {
+final randomSongsProvider = FutureProvider<List<Track>>((ref) async {
   return ref.watch(trackRepositoryProvider).getRandomTracks(limit: 30);
 });
 
-final recentSongsProvider = FutureProvider.autoDispose<List<Track>>((
-  ref,
-) async {
+final recentSongsProvider = FutureProvider<List<Track>>((ref) async {
   return ref.watch(trackRepositoryProvider).getRecentTracks();
 });
 
-final recommendedAlbumsProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      return ref.watch(trackRepositoryProvider).getDiscoveryAlbums();
-    });
-
-final playHistoryProvider = FutureProvider.autoDispose<List<Track>>((
+final recommendedAlbumsProvider = FutureProvider<List<DiscoveryAlbum>>((
   ref,
 ) async {
+  return ref.watch(trackRepositoryProvider).getDiscoveryAlbums();
+});
+
+final playHistoryProvider = FutureProvider<List<Track>>((ref) async {
   final history = await ref.watch(trackRepositoryProvider).getPlayHistory();
   // 去重：保留每个 ID 第一次出现的记录（通常是最新的）
   final seenIds = <String>{};
@@ -50,6 +45,15 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  Future<void> _refreshHomeFeed() async {
+    await Future.wait<Object?>([
+      ref.refresh(randomSongsProvider.future),
+      ref.refresh(recentSongsProvider.future),
+      ref.refresh(playHistoryProvider.future),
+      ref.refresh(recommendedAlbumsProvider.future),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final randomAsync = ref.watch(randomSongsProvider);
@@ -68,33 +72,28 @@ class _HomePageState extends ConsumerState<HomePage> {
       backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(randomSongsProvider);
-            ref.invalidate(recentSongsProvider);
-            ref.invalidate(playHistoryProvider);
-            ref.invalidate(recommendedAlbumsProvider);
-            ref.invalidate(tracksDataProvider(null));
-          },
+          onRefresh: _refreshHomeFeed,
+          triggerMode: RefreshIndicatorTriggerMode.anywhere,
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                   decoration: BoxDecoration(
                     gradient: AppTheme.heroGradient(colorScheme),
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.14),
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.16),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.10),
-                        blurRadius: 24,
-                        offset: const Offset(0, 14),
+                        color: colorScheme.shadow.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
@@ -102,47 +101,65 @@ class _HomePageState extends ConsumerState<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '音乐',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '\u97f3\u4e50',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '\u7ee7\u7eed\u8046\u542c\u4f60\u7684\u6536\u85cf\u3001\u6b4c\u5355\u548c\u6700\u8fd1\u64ad\u653e',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(child: const SizedBox.shrink()),
-                          // Search Button
-                          GestureDetector(
+                          const SizedBox(width: 12),
+                          InkWell(
                             onTap: () => context.push('/search'),
+                            borderRadius: BorderRadius.circular(18),
                             child: Container(
-                              padding: const EdgeInsets.all(9),
+                              width: 42,
+                              height: 42,
                               decoration: BoxDecoration(
                                 color: colorScheme.surface.withValues(
-                                  alpha: 0.34,
+                                  alpha: 0.48,
                                 ),
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: colorScheme.outlineVariant.withValues(
-                                    alpha: 0.2,
+                                    alpha: 0.16,
                                   ),
                                 ),
                               ),
+                              alignment: Alignment.center,
                               child: Icon(
                                 Icons.search_rounded,
-                                size: 19,
+                                size: 18,
                                 color: colorScheme.onSurface,
                               ),
                             ),
                           ),
                           const SizedBox(width: 10),
-                          // Rotating Disc (Mini version for Header)
                           const _TopPlayingIndicator(),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 14),
                       _buildMyLibraryEntrances(
                         context,
                         favoritesAsync,
@@ -151,12 +168,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 26),
 
                 // 1. Random Discovery
                 _buildSectionHeader(
                   context,
-                  '随机发现',
+                  '\u968f\u673a\u53d1\u73b0',
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => randomAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -169,9 +186,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 const SizedBox(height: 10),
                 randomAsync.when(
                   loading: () => const _SectionLoading(height: 160),
-                  error: (e, _) => Text('错误: $e'),
+                  error: (e, _) => Text('\u9519\u8bef: $e'),
                   data: (tracks) => SizedBox(
-                    height: 160,
+                    height: 168,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: tracks.length,
@@ -185,12 +202,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
                 // 2. Recently Added
                 _buildSectionHeader(
                   context,
-                  '最近添加',
+                  '\u6700\u8fd1\u6dfb\u52a0',
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => recentAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -203,9 +220,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 const SizedBox(height: 10),
                 recentAsync.when(
                   loading: () => const _SectionLoading(height: 160),
-                  error: (e, _) => Text('错误: $e'),
+                  error: (e, _) => Text('\u9519\u8bef: $e'),
                   data: (tracks) => SizedBox(
-                    height: 160,
+                    height: 168,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: tracks.take(10).length,
@@ -219,12 +236,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
                 // 3. Play History
                 _buildSectionHeader(
                   context,
-                  '播放历史',
+                  '\u64ad\u653e\u5386\u53f2',
                   actionIcon: Icons.play_circle_filled_rounded,
                   onAction: () => historyAsync.whenData((tracks) {
                     if (tracks.isNotEmpty) {
@@ -237,13 +254,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                 const SizedBox(height: 10),
                 historyAsync.when(
                   loading: () => const _SectionLoading(height: 140),
-                  error: (e, _) => Text('错误: $e'),
+                  error: (e, _) => Text('\u9519\u8bef: $e'),
                   data: (tracks) {
                     if (tracks.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
-                          '暂无播放历史',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                          '\u6682\u65e0\u64ad\u653e\u5386\u53f2',
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
                         ),
                       );
                     }
@@ -266,7 +286,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
                 // 4. Recommended Albums
                 _buildSectionHeader(context, '探索专辑'),
@@ -275,32 +295,48 @@ class _HomePageState extends ConsumerState<HomePage> {
                   loading: () => const _SectionLoading(height: 160),
                   error: (e, _) => Text('错误: $e'),
                   data: (albums) => SizedBox(
-                    height: 160,
+                    height: 172,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: albums.length,
                       itemBuilder: (context, index) {
                         final album = albums[index];
-                        final albumName = album['album'] as String;
                         return _buildAlbumCard(
                           context,
-                          albumName,
-                          album['artist'] as String,
-                          '$baseUrl/api/tracks/${album['id']}/cover?auth=$token',
+                          album.album,
+                          album.artist,
+                          '$baseUrl/api/tracks/${album.coverTrackId}/cover?auth=$token',
                           onTap: () async {
-                            final allTracksData = await ref.read(
-                              tracksDataProvider(null).future,
-                            );
-                            final albumTracks = allTracksData.tracks
-                                .where((t) => t.album == albumName)
-                                .toList();
-                            if (!context.mounted) return;
-                            _showAlbumDetails(
-                              context,
-                              ref,
-                              albumName,
-                              albumTracks,
-                            );
+                            try {
+                              final albumTracks = await ref
+                                  .read(trackRepositoryProvider)
+                                  .getAlbumTracks(
+                                    album: album.album,
+                                    artist: album.artist,
+                                  );
+                              if (!context.mounted) return;
+                              if (albumTracks.isEmpty) {
+                                ModernToast.show(
+                                  context,
+                                  '未找到该专辑的歌曲',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              _showAlbumDetails(
+                                context,
+                                ref,
+                                album.album,
+                                albumTracks,
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ModernToast.show(
+                                context,
+                                '加载专辑失败: $error',
+                                isError: true,
+                              );
+                            }
                           },
                         );
                       },
@@ -322,20 +358,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     AsyncValue<List<UserPlaylist>> playlistsAsync,
   ) {
     return SizedBox(
-      height: 86,
+      height: 70,
       child: Row(
         children: [
           Expanded(
             child: _buildLibraryEntryChip(
               context,
               icon: Icons.favorite_rounded,
-              label: '收藏',
+              label: '\u6536\u85cf',
               countText: favoritesAsync.maybeWhen(
-                data: (tracks) => '${tracks.length}',
-                loading: () => '...',
+                data: (tracks) => '${tracks.length} \u9996',
+                loading: () => '\u52a0\u8f7d\u4e2d',
                 orElse: () => '--',
               ),
-              accentColor: Colors.pinkAccent,
+              accentColor: const Color(0xFFFF5D93),
               onTap: () => favoritesAsync.whenData(
                 (tracks) => _showFavoritesSheet(context, tracks),
               ),
@@ -346,13 +382,13 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: _buildLibraryEntryChip(
               context,
               icon: Icons.queue_music_rounded,
-              label: '歌单',
+              label: '\u6b4c\u5355',
               countText: playlistsAsync.maybeWhen(
-                data: (playlists) => '${playlists.length}',
-                loading: () => '...',
+                data: (playlists) => '${playlists.length} \u4e2a',
+                loading: () => '\u52a0\u8f7d\u4e2d',
                 orElse: () => '--',
               ),
-              accentColor: Colors.lightBlueAccent,
+              accentColor: const Color(0xFF5AC8FA),
               onTap: () => playlistsAsync.whenData(
                 (playlists) => _showPlaylistsSheet(context, playlists),
               ),
@@ -376,37 +412,33 @@ class _HomePageState extends ConsumerState<HomePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
       child: Container(
-        height: 86,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        height: 70,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              colorScheme.surface.withValues(alpha: 0.42),
-              colorScheme.surfaceContainerHigh.withValues(alpha: 0.68),
+              colorScheme.surfaceContainerHigh.withValues(alpha: 0.92),
+              colorScheme.surfaceContainer.withValues(alpha: 0.88),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.16),
+          ),
         ),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.16),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: accentColor, size: 21),
+              alignment: Alignment.center,
+              child: Icon(icon, color: accentColor, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -416,22 +448,29 @@ class _HomePageState extends ConsumerState<HomePage> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     countText,
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
                       color: colorScheme.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],
               ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              size: 16,
             ),
           ],
         ),
@@ -442,47 +481,54 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildSectionHeader(
     BuildContext context,
     String title, {
+    String? subtitle,
     IconData? actionIcon,
     VoidCallback? onAction,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        const Spacer(),
         if (actionIcon != null && onAction != null)
-          GestureDetector(
+          InkWell(
             onTap: onAction,
+            borderRadius: BorderRadius.circular(999),
             child: Container(
-              width: 38,
-              height: 38,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: colorScheme.primary,
+                color: colorScheme.primary.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.22),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
               alignment: Alignment.center,
-              child: Icon(actionIcon, color: colorScheme.onPrimary, size: 18),
+              child: Icon(actionIcon, color: colorScheme.primary, size: 22),
             ),
           ),
       ],
@@ -713,43 +759,43 @@ class _HomePageState extends ConsumerState<HomePage> {
     return GestureDetector(
       onTap: () =>
           ref.read(playerHandlerProvider).loadQueue(queue, startIndex: index),
-      child: Container(
+      child: SizedBox(
         width: 112,
-        margin: const EdgeInsets.only(right: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 112,
-              height: 112,
+              height: 104,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.14),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 12),
+                    color: colorScheme.shadow.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(14),
                 child: CachedNetworkImage(
                   imageUrl:
                       '${auth.baseUrl}/api/tracks/${track.id}/cover?auth=${auth.token}',
                   cacheKey: 'cover_${track.id}',
                   width: 112,
-                  height: 112,
+                  height: 104,
                   fit: BoxFit.cover,
                   errorWidget: (context, url, error) => Container(
                     width: 112,
-                    height: 112,
+                    height: 104,
                     color: colorScheme.surfaceContainerHighest,
                     child: Icon(
-                      Icons.music_note,
+                      Icons.music_note_rounded,
                       color: colorScheme.primary,
                       size: 30,
                     ),
@@ -757,23 +803,29 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               track.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: colorScheme.onSurface,
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               track.artist,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFB3B3B3), fontSize: 9),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.15,
+              ),
             ),
           ],
         ),
@@ -791,47 +843,51 @@ class _HomePageState extends ConsumerState<HomePage> {
     final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 100,
-        margin: const EdgeInsets.only(right: 12),
+      child: SizedBox(
+        width: 110,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: 110,
+              height: 110,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 image: DecorationImage(
                   image: NetworkImage(url),
                   fit: BoxFit.cover,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: colorScheme.shadow.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: colorScheme.onSurface,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFB3B3B3), fontSize: 9),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -849,6 +905,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Center(
         child: Container(
@@ -928,6 +987,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Center(
         child: Container(
@@ -1235,7 +1297,7 @@ class _TopPlayingIndicatorState extends ConsumerState<_TopPlayingIndicator>
                     alignment: Alignment.center,
                     children: [
                       CustomPaint(
-                        size: const Size(40, 40),
+                        size: const Size(36, 36),
                         painter: _TopCircularProgressPainter(
                           progress: progress,
                           color: Theme.of(context).colorScheme.primary,
@@ -1252,8 +1314,8 @@ class _TopPlayingIndicatorState extends ConsumerState<_TopPlayingIndicator>
                           );
                         },
                         child: Container(
-                          width: 34,
-                          height: 34,
+                          width: 30,
+                          height: 30,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                           ),

@@ -11,6 +11,7 @@ import '../../shared/widgets/mini_player.dart';
 import '../../shared/widgets/track_action_sheet.dart';
 import '../library/library_page.dart';
 import 'network_search_provider.dart';
+import 'search_query_debouncer.dart';
 import 'search_history_provider.dart';
 
 enum SearchScope { local, all, network }
@@ -52,6 +53,7 @@ class SearchPage extends ConsumerStatefulWidget {
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  late final SearchQueryDebouncer _networkDebouncer = SearchQueryDebouncer();
 
   @override
   void initState() {
@@ -59,24 +61,48 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     _searchController.text = ref.read(searchQueryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(searchScopeProvider.notifier).state = widget.initialScope;
-      ref.read(networkSearchQueryProvider.notifier).state = ref.read(
-        searchQueryProvider,
-      );
-      _focusNode.requestFocus();
+      _commitNetworkQuery(ref.read(searchQueryProvider));
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
     });
   }
 
   @override
   void dispose() {
+    _networkDebouncer.dispose();
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _updateQuery(String value, {bool remember = false}) {
+  void _commitNetworkQuery(String query) {
+    ref.read(networkSearchQueryProvider.notifier).state = query;
+  }
+
+  void _setScope(SearchScope scope) {
+    ref.read(searchScopeProvider.notifier).state = scope;
+    if (scope != SearchScope.local &&
+        _searchController.text.trim().isNotEmpty) {
+      _networkDebouncer.flush(_searchController.text, _commitNetworkQuery);
+    }
+  }
+
+  void _updateQuery(
+    String value, {
+    bool remember = false,
+    bool flushNetwork = false,
+  }) {
     final query = value.trim();
     ref.read(searchQueryProvider.notifier).state = query;
-    ref.read(networkSearchQueryProvider.notifier).state = query;
+    if (query.isEmpty) {
+      _networkDebouncer.cancel();
+      _commitNetworkQuery('');
+    } else if (flushNetwork) {
+      _networkDebouncer.flush(query, _commitNetworkQuery);
+    } else {
+      _networkDebouncer.schedule(query, _commitNetworkQuery);
+    }
     if (remember && query.isNotEmpty) {
       ref.read(searchHistoryProvider.notifier).addQuery(query);
     }
@@ -87,13 +113,28 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final query = ref.watch(searchQueryProvider);
     final scope = ref.watch(searchScopeProvider);
     final category = ref.watch(searchCategoryProvider);
-    final history = ref.watch(searchHistoryProvider);
-    final localResults = ref.watch(filteredTracksProvider);
-    final networkResults = ref.watch(networkSearchResultsProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+    
+    final historyState = ref.watch(searchHistoryProvider);
+    final localTracksState = ref.watch(filteredTracksProvider);
+    final networkTracksState = ref.watch(networkSearchResultsProvider);
+
+    final includeLocalResults = scope != SearchScope.network;
+    final includeNetworkResults = scope != SearchScope.local;
+
+    final history = query.isEmpty ? historyState : const <String>[];
+    final localResults = includeLocalResults && query.isNotEmpty
+        ? localTracksState
+        : const <Track>[];
+    final networkResults = includeNetworkResults && query.isNotEmpty
+        ? networkTracksState
+        : const AsyncData<List<NetworkTrack>>(<NetworkTrack>[]);
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+      resizeToAvoidBottomInset: true,
       bottomNavigationBar: const SafeArea(top: false, child: MiniPlayer()),
       body: ColoredBox(
         color: colorScheme.surface,
@@ -101,80 +142,139 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      onPressed: () => context.pop(),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.surfaceContainerHigh.withValues(
+                          alpha: 0.94,
+                        ),
+                        colorScheme.surfaceContainer.withValues(alpha: 0.9),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    Expanded(
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(
-                            alpha: 0.3,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _focusNode,
-                          textAlignVertical: TextAlignVertical.center,
-                          textInputAction: TextInputAction.search,
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(
-                              Icons.search_rounded,
-                              size: 20,
-                            ),
-                            hintText: '搜索本地和全网音乐',
-                            hintStyle: TextStyle(
-                              color: colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.5,
-                              ),
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(
-                                      Icons.close_rounded,
-                                      size: 20,
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _updateQuery('');
-                                      setState(() {});
-                                    },
-                                  )
-                                : null,
-                          ),
-                          onChanged: (value) {
-                            _updateQuery(value);
-                            setState(() {});
-                          },
-                          onSubmitted: (value) =>
-                              _updateQuery(value, remember: true),
-                        ),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.shadow.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 12),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 18,
+                              ),
+                              onPressed: () => context.pop(),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface.withValues(
+                                  alpha: 0.46,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: colorScheme.outlineVariant.withValues(
+                                    alpha: 0.16,
+                                  ),
+                                ),
+                              ),
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _focusNode,
+                                autofocus: true,
+                                textAlignVertical: TextAlignVertical.center,
+                                textInputAction: TextInputAction.search,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.search_rounded,
+                                    size: 20,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  hintText: '搜索本地与全网音乐',
+                                  hintStyle: TextStyle(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.64),
+                                    fontSize: 14,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(
+                                            Icons.close_rounded,
+                                            size: 18,
+                                          ),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            _updateQuery('');
+                                          },
+                                        )
+                                      : null,
+                                ),
+                                onChanged: (value) {
+                                  _updateQuery(value);
+                                },
+                                onSubmitted: (value) => _updateQuery(
+                                  value,
+                                  remember: true,
+                                  flushNetwork: true,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _buildChipRail(
+                        label: '搜索范围',
+                        child: _buildScopeBar(scope),
+                      ),
+                      if (query.isNotEmpty && scope != SearchScope.local) ...[
+                        const SizedBox(height: 10),
+                        _buildChipRail(
+                          label: '音源',
+                          child: _buildNetworkSourceBar(),
+                        ),
+                      ],
+                      if (query.isNotEmpty && scope != SearchScope.network) ...[
+                        const SizedBox(height: 10),
+                        _buildChipRail(
+                          label: '本地分类',
+                          child: _buildLocalCategoryBar(category),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              _buildScopeBar(scope),
-              if (query.isNotEmpty && scope != SearchScope.local)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _buildNetworkSourceBar(),
-                ),
-              if (query.isNotEmpty && scope != SearchScope.network)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _buildLocalCategoryBar(category),
-                ),
               Expanded(
                 child: query.isEmpty
                     ? _buildSearchHistory(history)
@@ -192,29 +292,52 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
+  Widget _buildChipRail({required String label, required Widget child}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+
   Widget _buildScopeBar(SearchScope scope) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           _ScopeChip(
             label: '本地',
             selected: scope == SearchScope.local,
-            onTap: () => ref.read(searchScopeProvider.notifier).state =
-                SearchScope.local,
+            onTap: () => _setScope(SearchScope.local),
           ),
           _ScopeChip(
             label: '全部',
             selected: scope == SearchScope.all,
-            onTap: () =>
-                ref.read(searchScopeProvider.notifier).state = SearchScope.all,
+            onTap: () => _setScope(SearchScope.all),
           ),
           _ScopeChip(
             label: '全网',
             selected: scope == SearchScope.network,
-            onTap: () => ref.read(searchScopeProvider.notifier).state =
-                SearchScope.network,
+            onTap: () => _setScope(SearchScope.network),
           ),
         ],
       ),
@@ -225,25 +348,18 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final items = const <(String key, String label)>[
       ('songs', '歌曲'),
       ('albums', '专辑'),
-      ('artists', '艺术家'),
+      ('artists', '艺人'),
     ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: items.map((item) {
-          final isSelected = category == item.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: ChoiceChip(
-              label: Text(item.$2),
-              selected: isSelected,
-              showCheckmark: false,
-              onSelected: (_) {
-                ref.read(searchCategoryProvider.notifier).state = item.$1;
-              },
-            ),
+          return _ScopeChip(
+            label: item.$2,
+            selected: category == item.$1,
+            onTap: () =>
+                ref.read(searchCategoryProvider.notifier).state = item.$1,
           );
         }).toList(),
       ),
@@ -261,19 +377,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: sources.map((item) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: ChoiceChip(
-              label: Text(item.$2),
-              selected: source == item.$1,
-              showCheckmark: false,
-              onSelected: (_) {
-                ref.read(networkSearchSourceProvider.notifier).state = item.$1;
-              },
-            ),
+          return _ScopeChip(
+            label: item.$2,
+            selected: source == item.$1,
+            onTap: () =>
+                ref.read(networkSearchSourceProvider.notifier).state = item.$1,
           );
         }).toList(),
       ),
@@ -340,7 +450,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                       ),
                       onPressed: () {
                         _searchController.text = item;
-                        _updateQuery(item, remember: true);
+                        _updateQuery(item, remember: true, flushNetwork: true);
                       },
                     );
                   }).toList(),
@@ -525,32 +635,41 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   Widget _buildResultSectionTitle(String title, {String? trailing}) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Text(
             title,
             style: TextStyle(
               color: colorScheme.onSurface,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               fontSize: 15,
             ),
           ),
-        ),
-        const Spacer(),
-        if (trailing != null)
-          Text(
-            trailing,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          const Spacer(),
+          if (trailing != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                trailing,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -963,41 +1082,139 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void _showDownloadOptions(NetworkTrack track) {
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('标准音质'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _handleDownload(track, 'standard');
-              },
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final options = const <(String level, String label, String note)>[
+          ('standard', '标准音质', '适合日常离线收听'),
+          ('exhigh', '极高音质 (320k)', '优先保留更好的细节'),
+          ('lossless', '无损音质', '适合对音质有要求的本地库'),
+          ('hires', 'Hi-Res', '如音源支持，优先下载最高规格'),
+        ];
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+              ),
             ),
-            ListTile(
-              title: const Text('极高音质 (320k)'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _handleDownload(track, 'exhigh');
-              },
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.24,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '选择下载音质',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+                    ...options.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _handleDownload(track, item.$1);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface.withValues(
+                                alpha: 0.44,
+                              ),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.14,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.14,
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    Icons.download_rounded,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.$2,
+                                        style: TextStyle(
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item.$3,
+                                        style: TextStyle(
+                                          color: colorScheme.onSurfaceVariant,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
             ),
-            ListTile(
-              title: const Text('无损音质'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _handleDownload(track, 'lossless');
-              },
-            ),
-            ListTile(
-              title: const Text('Hi-Res'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _handleDownload(track, 'hires');
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1018,25 +1235,34 @@ class _ScopeChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 10),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        showCheckmark: false,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.26)
-              : colorScheme.outlineVariant.withValues(alpha: 0.16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.16)
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary.withValues(alpha: 0.26)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.16),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
         ),
-        backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.18,
-        ),
-        selectedColor: colorScheme.primary.withValues(alpha: 0.14),
-        labelStyle: TextStyle(
-          color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-        ),
-        onSelected: (_) => onTap(),
       ),
     );
   }

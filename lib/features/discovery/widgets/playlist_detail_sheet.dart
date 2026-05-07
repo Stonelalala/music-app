@@ -17,6 +17,9 @@ class PlaylistDetailSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => PlaylistDetailSheet(playlist: playlist),
     );

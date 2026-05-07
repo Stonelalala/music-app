@@ -1,12 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:endColor="#020504"
+                android:centerColor="#071A12"
+                android:startColor="#04100B" />
+        </shape>
+    </item>
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <item
+        android:gravity="top|right"
+        android:width="320dp"
+        android:height="320dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="180dp"
+                android:centerColor="#6653FF9C"
+                android:endColor="#0053FF9C"
+                android:startColor="#AA8BFFD2" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="bottom|left"
+        android:width="280dp"
+        android:height="280dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="170dp"
+                android:centerColor="#4467C8FF"
+                android:endColor="#00318FFF"
+                android:startColor="#887CE7FF" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="center"
+        android:width="250dp"
+        android:height="250dp">
+        <shape android:shape="oval">
+            <solid android:color="#00000000" />
+            <stroke
+                android:width="1dp"
+                android:color="#2FFFFFFF" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="center"
+        android:width="186dp"
+        android:height="186dp">
+        <shape android:shape="oval">
+            <solid android:color="#00000000" />
+            <stroke
+                android:width="1dp"
+                android:color="#26B5FFDA" />
+        </shape>
+    </item>
+
+    <item android:top="168dp" android:left="40dp" android:right="40dp">
+        <shape android:shape="rectangle">
+            <size android:height="2dp" />
+            <gradient
+                android:angle="0"
+                android:endColor="#0055FFD5"
+                android:centerColor="#B455FFD5"
+                android:startColor="#0055FFD5" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
 </layer-list>

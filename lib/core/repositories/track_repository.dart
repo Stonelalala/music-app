@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../http/api_client.dart';
 import '../../shared/models/track.dart';
+import '../../shared/models/discovery_album.dart';
 import '../../shared/models/network_track.dart';
 
 class TrackRepository {
@@ -42,9 +44,29 @@ class TrackRepository {
     return list.map((e) => Track.fromJson(e)).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getDiscoveryAlbums() async {
+  Future<List<DiscoveryAlbum>> getDiscoveryAlbums() async {
     final data = await _api.get<Map<String, dynamic>>('/api/discovery/albums');
-    return (data['data'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final list = data['data'] as List<dynamic>;
+    return list
+        .map((item) => DiscoveryAlbum.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<Track>> getAlbumTracks({
+    required String album,
+    String? artist,
+  }) async {
+    final data = await _api.get<Map<String, dynamic>>(
+      '/api/discovery/album-tracks',
+      params: {
+        'album': album,
+        if (artist != null && artist.trim().isNotEmpty) 'artist': artist,
+      },
+    );
+    final list = data['data'] as List<dynamic>;
+    return list
+        .map((item) => Track.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   Future<String?> getLyrics(String trackId) async {
@@ -64,11 +86,7 @@ class TrackRepository {
   }) async {
     final response = await _api.get<Map<String, dynamic>>(
       '/api/lyrics/search-web',
-      params: {
-        'title': track.title,
-        'artist': track.artist,
-        'source': source,
-      },
+      params: {'title': track.title, 'artist': track.artist, 'source': source},
     );
     final lyrics = response['lyrics'] as String?;
     if (lyrics == null || lyrics.trim().isEmpty) {
@@ -146,13 +164,25 @@ class TrackRepository {
     await _api.post('/api/kuwo/download', data: {'id': id, 'level': level});
   }
 
-  Future<List<NetworkTrack>> searchNetworkTracks(String query, String source) async {
+  Future<List<NetworkTrack>> searchNetworkTracks(
+    String query,
+    String source, {
+    CancelToken? cancelToken,
+  }) async {
     final data = await _api.get<Map<String, dynamic>>(
       '/api/search-metadata',
       params: {'q': query, 'source': source},
+      cancelToken: cancelToken,
     );
     final list = data['results'] as List<dynamic>? ?? [];
-    return list.map((e) => NetworkTrack.fromJson(e as Map<String, dynamic>, defaultSource: source)).toList();
+    return list
+        .map(
+          (item) => NetworkTrack.fromJson(
+            item as Map<String, dynamic>,
+            defaultSource: source,
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<void> deleteTracks(List<String> ids) async {

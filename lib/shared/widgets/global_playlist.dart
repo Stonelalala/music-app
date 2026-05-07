@@ -19,200 +19,238 @@ class GlobalPlaylist {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => FractionallySizedBox(
         heightFactor: 0.76,
-        child: DefaultTabController(
-          length: 2,
-          child: AnimatedBuilder(
-            animation: handler,
-            builder: (context, child) {
-              final queue = handler.trackQueue;
-              final history = handler.playHistory;
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh.withValues(
-                            alpha: 0.82,
-                          ),
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withValues(
-                              alpha: 0.16,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.surfaceContainerHigh.withValues(alpha: 0.96),
+                  colorScheme.surfaceContainer.withValues(alpha: 0.94),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.14),
+                  blurRadius: 28,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: DefaultTabController(
+              length: 2,
+              child: AnimatedBuilder(
+                animation: handler,
+                builder: (context, child) {
+                  final queue = handler.trackQueue;
+                  final history = handler.playHistory;
+                  return SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.24,
+                              ),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHigh
+                                  .withValues(alpha: 0.82),
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.16,
+                                ),
+                              ),
+                            ),
+                            child: Column(
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '\u64ad\u653e\u961f\u5217',
-                                        style: TextStyle(
-                                          color: colorScheme.onSurface,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 20,
-                                        ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '\u64ad\u653e\u961f\u5217',
+                                            style: TextStyle(
+                                              color: colorScheme.onSurface,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 20,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 6),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _SheetIconAction(
+                                      tooltip:
+                                          '\u4fdd\u5b58\u961f\u5217\u4e3a\u6b4c\u5355',
+                                      icon: Icons
+                                          .playlist_add_check_circle_outlined,
+                                      onPressed: queue.isEmpty
+                                          ? null
+                                          : () => _saveQueueAsPlaylist(
+                                              sheetContext,
+                                              ref,
+                                              queue,
+                                            ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _SheetIconAction(
+                                      tooltip: '\u6e05\u7a7a\u961f\u5217',
+                                      icon: Icons.delete_sweep_outlined,
+                                      destructive: true,
+                                      onPressed: queue.isEmpty
+                                          ? null
+                                          : () async {
+                                              await handler.clearQueue();
+                                              if (sheetContext.mounted) {
+                                                Navigator.of(
+                                                  sheetContext,
+                                                ).pop();
+                                              }
+                                            },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHigh
+                                  .withValues(alpha: 0.46),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.14,
+                                ),
+                              ),
+                            ),
+                            child: TabBar(
+                              dividerColor: Colors.transparent,
+                              indicator: BoxDecoration(
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.16,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              indicatorSize: TabBarIndicatorSize.tab,
+                              labelColor: colorScheme.primary,
+                              unselectedLabelColor:
+                                  colorScheme.onSurfaceVariant,
+                              labelStyle: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                              tabs: [
+                                Tab(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('\u5f53\u524d\u961f\u5217'),
+                                      const SizedBox(width: 6),
                                       Text(
-                                        '\u62d6\u62fd\u53ef\u4ee5\u7acb\u5373\u8c03\u6574\u987a\u5e8f\uff0c\u5386\u53f2\u9875\u53ef\u4ece\u6700\u8fd1\u64ad\u8fc7\u7684\u66f2\u76ee\u91cd\u65b0\u70b9\u64ad\u3002',
-                                        style: TextStyle(
-                                          color: colorScheme.onSurfaceVariant,
-                                          fontSize: 12,
-                                          height: 1.45,
+                                        '${queue.length}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                _SheetIconAction(
-                                  tooltip:
-                                      '\u4fdd\u5b58\u961f\u5217\u4e3a\u6b4c\u5355',
-                                  icon:
-                                      Icons.playlist_add_check_circle_outlined,
-                                  onPressed: queue.isEmpty
-                                      ? null
-                                      : () => _saveQueueAsPlaylist(
-                                          sheetContext,
-                                          ref,
-                                          queue,
+                                Tab(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('\u64ad\u653e\u5386\u53f2'),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${history.length}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
                                         ),
-                                ),
-                                const SizedBox(width: 8),
-                                _SheetIconAction(
-                                  tooltip: '\u6e05\u7a7a\u961f\u5217',
-                                  icon: Icons.delete_sweep_outlined,
-                                  destructive: true,
-                                  onPressed: queue.isEmpty
-                                      ? null
-                                      : () async {
-                                          await handler.clearQueue();
-                                          if (sheetContext.mounted) {
-                                            Navigator.of(sheetContext).pop();
-                                          }
-                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
-                            Row(
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: TabBarView(
                               children: [
-                                Expanded(
-                                  child: _QueueMetricPill(
-                                    icon: Icons.queue_music_rounded,
-                                    label: '\u5f53\u524d\u961f\u5217',
-                                    value: '${queue.length}',
-                                    colorScheme: colorScheme,
-                                    highlighted: true,
-                                  ),
+                                _QueueList(
+                                  tracks: queue,
+                                  currentIndex: handler.currentIndex,
+                                  baseUrl: baseUrl,
+                                  token: token,
+                                  colorScheme: colorScheme,
+                                  onTap: (index) async {
+                                    await handler.loadQueue(
+                                      queue,
+                                      startIndex: index,
+                                    );
+                                    if (sheetContext.mounted) {
+                                      Navigator.of(sheetContext).pop();
+                                    }
+                                  },
+                                  onReorder: handler.moveQueueItem,
+                                  onRemove: handler.removeQueueItemAt,
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _QueueMetricPill(
-                                    icon: Icons.history_rounded,
-                                    label: '\u64ad\u653e\u5386\u53f2',
-                                    value: '${history.length}',
-                                    colorScheme: colorScheme,
-                                  ),
+                                _HistoryList(
+                                  tracks: history,
+                                  baseUrl: baseUrl,
+                                  token: token,
+                                  colorScheme: colorScheme,
+                                  onTap: (index) async {
+                                    await handler.playTrackPreservingQueue(
+                                      history[index],
+                                    );
+                                    if (sheetContext.mounted) {
+                                      Navigator.of(sheetContext).pop();
+                                    }
+                                  },
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh.withValues(
-                            alpha: 0.46,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withValues(
-                              alpha: 0.14,
-                            ),
-                          ),
-                        ),
-                        child: TabBar(
-                          dividerColor: Colors.transparent,
-                          indicator: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          labelColor: colorScheme.primary,
-                          unselectedLabelColor: colorScheme.onSurfaceVariant,
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                          tabs: const [
-                            Tab(text: '\u5f53\u524d\u961f\u5217'),
-                            Tab(text: '\u64ad\u653e\u5386\u53f2'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _QueueList(
-                              tracks: queue,
-                              currentIndex: handler.currentIndex,
-                              baseUrl: baseUrl,
-                              token: token,
-                              colorScheme: colorScheme,
-                              onTap: (index) async {
-                                await handler.loadQueue(
-                                  queue,
-                                  startIndex: index,
-                                );
-                                if (sheetContext.mounted) {
-                                  Navigator.of(sheetContext).pop();
-                                }
-                              },
-                              onReorder: handler.moveQueueItem,
-                              onRemove: handler.removeQueueItemAt,
-                            ),
-                            _HistoryList(
-                              tracks: history,
-                              baseUrl: baseUrl,
-                              token: token,
-                              colorScheme: colorScheme,
-                              onTap: (index) async {
-                                await handler.playTrackPreservingQueue(
-                                  history[index],
-                                );
-                                if (sheetContext.mounted) {
-                                  Navigator.of(sheetContext).pop();
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -326,63 +364,6 @@ class _SheetIconAction extends StatelessWidget {
             child: Icon(icon, color: foreground, size: 22),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _QueueMetricPill extends StatelessWidget {
-  const _QueueMetricPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.colorScheme,
-    this.highlighted = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final ColorScheme colorScheme;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final background = highlighted
-        ? colorScheme.primary.withValues(alpha: 0.14)
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.38);
-    final foreground = highlighted
-        ? colorScheme.primary
-        : colorScheme.onSurfaceVariant;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: foreground),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
       ),
     );
   }

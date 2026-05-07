@@ -1,17 +1,23 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' as rendering;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../shared/widgets/mini_player.dart';
-import '../home/home_page.dart';
-import '../library/library_page.dart';
-import '../discovery/discovery_page.dart';
-import '../settings/settings_page.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final Widget child;
-  const MainShell({super.key, required this.child});
+  final String currentLocation;
+  final Widget miniPlayer;
+
+  const MainShell({
+    super.key,
+    required this.child,
+    required this.currentLocation,
+    this.miniPlayer = const MiniPlayer(),
+  });
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -22,20 +28,19 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     int currentIndex = 0;
-    if (location.startsWith('/home')) currentIndex = 0;
-    if (location.startsWith('/library')) currentIndex = 1;
-    if (location.startsWith('/discovery')) currentIndex = 2;
-    if (location.startsWith('/my')) currentIndex = 3;
+    if (widget.currentLocation.startsWith('/home')) currentIndex = 0;
+    if (widget.currentLocation.startsWith('/library')) currentIndex = 1;
+    if (widget.currentLocation.startsWith('/discovery')) currentIndex = 2;
+    if (widget.currentLocation.startsWith('/my')) currentIndex = 3;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: Stack(
         children: [
-          // 页面主要内容
           NotificationListener<UserScrollNotification>(
             onNotification: (notification) {
               if (notification.direction == rendering.ScrollDirection.reverse) {
@@ -46,108 +51,101 @@ class _MainShellState extends ConsumerState<MainShell> {
               }
               return false;
             },
-            child: IndexedStack(
-              index: currentIndex,
-              children: const [
-                HomePage(),
-                LibraryPage(),
-                DiscoveryPage(),
-                SettingsPage(),
-              ],
-            ),
+            child: widget.child,
           ),
-          // 悬浮层：迷你播放器和底部导航
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: AnimatedSlide(
               offset: _isVisible ? Offset.zero : const Offset(0, 1.2),
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOutCubic,
+              duration: const Duration(milliseconds: 360),
+              curve: Curves.easeOutCubic,
               child: SafeArea(
                 top: false,
-                bottom: true,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // 迷你播放器
-                    const MiniPlayer(),
-                    // 底部导航菜单
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(36, 0, 36, 16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(40),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      widget.miniPlayer,
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                           child: Container(
-                            height: 56,
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainer.withValues(
-                                alpha: 0.78,
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.surfaceContainerHigh.withValues(
+                                    alpha: 0.92,
+                                  ),
+                                  colorScheme.surfaceContainer.withValues(
+                                    alpha: 0.86,
+                                  ),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(40),
+                              borderRadius: BorderRadius.circular(28),
                               border: Border.all(
                                 color: colorScheme.outlineVariant.withValues(
-                                  alpha: 0.18,
+                                  alpha: 0.14,
                                 ),
-                                width: 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: colorScheme.primary.withValues(
-                                    alpha: 0.08,
+                                  color: colorScheme.shadow.withValues(
+                                    alpha: 0.1,
                                   ),
-                                  blurRadius: 20,
+                                  blurRadius: 18,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 _buildNavItem(
-                                  0,
-                                  Icons.home,
-                                  Icons.home_outlined,
-                                  '主页',
-                                  currentIndex,
-                                  context,
+                                  index: 0,
+                                  currentIndex: currentIndex,
+                                  icon: Icons.home_rounded,
+                                  outlinedIcon: Icons.home_outlined,
+                                  label: '\u4e3b\u9875',
+                                  onTap: () => context.go('/home'),
                                 ),
                                 _buildNavItem(
-                                  1,
-                                  Icons.music_note,
-                                  Icons.music_note_outlined,
-                                  '歌曲',
-                                  currentIndex,
-                                  context,
+                                  index: 1,
+                                  currentIndex: currentIndex,
+                                  icon: Icons.music_note_rounded,
+                                  outlinedIcon: Icons.music_note_outlined,
+                                  label: '\u6b4c\u66f2',
+                                  onTap: () => context.go('/library'),
                                 ),
                                 _buildNavItem(
-                                  2,
-                                  Icons.explore,
-                                  Icons.explore_outlined,
-                                  '发现',
-                                  currentIndex,
-                                  context,
+                                  index: 2,
+                                  currentIndex: currentIndex,
+                                  icon: Icons.explore_rounded,
+                                  outlinedIcon: Icons.explore_outlined,
+                                  label: '\u53d1\u73b0',
+                                  onTap: () => context.go('/discovery'),
                                 ),
                                 _buildNavItem(
-                                  3,
-                                  Icons.person,
-                                  Icons.person_outline,
-                                  '我的',
-                                  currentIndex,
-                                  context,
+                                  index: 3,
+                                  currentIndex: currentIndex,
+                                  icon: Icons.person_rounded,
+                                  outlinedIcon: Icons.person_outline_rounded,
+                                  label: '\u6211\u7684',
+                                  onTap: () => context.go('/my'),
                                 ),
                               ],
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -157,64 +155,60 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  Widget _buildNavItem(
-    int index,
-    IconData activeIcon,
-    IconData icon,
-    String label,
-    int currentIndex,
-    BuildContext context,
-  ) {
+  Widget _buildNavItem({
+    required int index,
+    required int currentIndex,
+    required IconData icon,
+    required IconData outlinedIcon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isSelected = index == currentIndex;
-    final activeColor = Theme.of(context).colorScheme.primary;
-    final inactiveColor = const Color(0xFFA1A1AA); // zinc-400
 
-    return GestureDetector(
-      onTap: () {
-        switch (index) {
-          case 0:
-            context.go('/home');
-            break;
-          case 1:
-            context.go('/library');
-            break;
-          case 2:
-            context.go('/discovery');
-            break;
-          case 3:
-            context.go('/my');
-            break;
-        }
-      },
-      child: Container(
-        color: Colors.transparent,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? activeColor.withValues(alpha: 0.14)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? colorScheme.primary.withValues(alpha: 0.14)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  isSelected ? icon : outlinedIcon,
+                  size: 20,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
               ),
-              child: Icon(
-                isSelected ? activeIcon : icon,
-                color: isSelected ? activeColor : inactiveColor,
-                size: 20,
+              const SizedBox(height: 5),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? activeColor : inactiveColor,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

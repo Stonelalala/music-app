@@ -11,6 +11,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/models/track.dart';
 import 'cache_service.dart';
+import 'equalizer_presets.dart';
+import 'equalizer_runtime_policy.dart';
+import 'equalizer_state.dart';
+import 'playback_autoplay_policy.dart';
+import 'playback_completion_policy.dart';
+import 'queue_preparation_policy.dart';
 
 class MusicPlayerHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler, ChangeNotifier {
@@ -18,10 +24,20 @@ class MusicPlayerHandler extends BaseAudioHandler
   static const _sessionStorageKey = 'player_session_state';
   static const _trackProgressStorageKey = 'track_resume_positions';
   static const _lyricOffsetStorageKey = 'track_lyric_offsets';
+  static const _equalizerPresetStorageKey = 'player_equalizer_preset';
+  static const _equalizerStateStorageKey = 'player_equalizer_state_v2';
   static const _maxHistoryLength = 100;
   static const _maxTrackResumeEntries = 300;
 
-  final AudioPlayer _player = AudioPlayer();
+  final AndroidEqualizer _equalizer = AndroidEqualizer();
+  late final AudioPlayer _player = _buildAudioPlayer();
+  late final Dio _networkDio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+      headers: {'Content-Type': 'application/json'},
+    ),
+  );
   List<Track> _queue = [];
   final List<Track> _history = [];
   int _currentIndex = 0;
@@ -48,6 +64,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   Timer? _sleepTicker;
   Duration? _sleepRemaining;
   int _lastPersistedSecond = -1;
+  EqualizerStateSnapshot _equalizerState = EqualizerStateSnapshot.empty();
+  AndroidEqualizerParameters? _equalizerParameters;
   Future<void> Function(String key, Object? value)? _remotePreferenceSync;
   final StreamController<Duration?> _sleepTimerController =
       StreamController<Duration?>.broadcast();
@@ -111,7 +129,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  void setAuth(String token, String baseUrl) {
+  void setAuth(String token, String baseUrl, {bool autoPlayOnRestore = false}) {
     debugPrint('Setting player auth: $baseUrl');
     _token = token;
     _baseUrl = baseUrl;
@@ -126,9 +144,14 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     if (_queue.isNotEmpty &&
         (_pendingRestorePosition != null || _player.audioSource == null)) {
+      final shouldAutoPlay = resolveAutoPlayBehavior(
+        trigger: PlaybackResumeTrigger.launchRestore,
+        wasPlaying: _pendingRestoreShouldResume,
+        autoPlayOnLaunchRestore: autoPlayOnRestore,
+      );
       unawaited(
         _playCurrentTrack(
-          autoPlay: _pendingRestoreShouldResume,
+          autoPlay: shouldAutoPlay,
           recordHistory: false,
           recordPlayback: false,
           initialPosition: _pendingRestorePosition,
@@ -138,15 +161,27 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
 
     if (_queue.isNotEmpty && _player.audioSource != null) {
+      final shouldResume = resolveAutoPlayBehavior(
+        trigger: PlaybackResumeTrigger.statePreservingRestore,
+        wasPlaying: _player.playing,
+        autoPlayOnLaunchRestore: autoPlayOnRestore,
+      );
       unawaited(
         _rebuildPreparedQueue(
-          shouldResume: _player.playing,
+          shouldResume: shouldResume,
           initialPosition: _player.position,
           recordHistory: false,
           recordPlayback: false,
         ),
       );
     }
+  }
+
+  void clearAuth() {
+    _token = null;
+    _baseUrl = null;
+    _preparedQueueSignature = '';
+    _pendingPlayAfterAuth = false;
   }
 
   void setCacheConfig(CacheService service, int maxBytes) {
@@ -204,6 +239,26 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
     }
 
+    final rawEqualizerState = prefs.getString(_equalizerStateStorageKey);
+    if (rawEqualizerState != null && rawEqualizerState.isNotEmpty) {
+      try {
+        _equalizerState = EqualizerStateSnapshot.fromJson(
+          jsonDecode(rawEqualizerState) as Map<String, dynamic>,
+        );
+      } catch (e) {
+        debugPrint('Failed to decode equalizer state: $e');
+      }
+    } else {
+      final legacyPresetId = EqualizerPresetProfile.fromId(
+        prefs.getString(_equalizerPresetStorageKey),
+      ).id;
+      _equalizerState = EqualizerStateSnapshot(
+        enabled: legacyPresetId != EqualizerPresetId.off.id,
+        presetId: legacyPresetId,
+        bands: const <EqualizerBandSetting>[],
+      );
+    }
+
     await _restoreSession();
     notifyListeners();
   }
@@ -219,13 +274,169 @@ class MusicPlayerHandler extends BaseAudioHandler
   AudioPlayer get player => _player;
   Stream<Duration?> get sleepTimerStream => _sleepTimerController.stream;
   Duration? get sleepTimerRemaining => _sleepRemaining;
+  String get equalizerPresetId => _equalizerState.presetId;
+  bool get equalizerEnabled => _equalizerState.enabled;
+  bool get equalizerReady => _equalizerParameters != null;
+  List<EqualizerBandSetting> get equalizerBands =>
+      List.unmodifiable(_equalizerState.bands);
+  double get equalizerMinDecibels => _equalizerParameters?.minDecibels ?? -12.0;
+  double get equalizerMaxDecibels => _equalizerParameters?.maxDecibels ?? 12.0;
+  bool get supportsEqualizer => _usesEqualizerPlaybackPipeline;
+  List<EqualizerPresetProfile> get equalizerPresets =>
+      EqualizerPresetProfile.profiles;
 
   int lyricOffsetForTrack(String trackId) => _lyricOffsets[trackId] ?? 0;
+  String? cachedLyricsForTrack(String trackId) =>
+      currentTrack?.id == trackId ? _currentRawLyrics : null;
 
   void setRemotePreferenceSync(
     Future<void> Function(String key, Object? value)? sync,
   ) {
     _remotePreferenceSync = sync;
+  }
+
+  AudioPlayer _buildAudioPlayer() {
+    if (_usesEqualizerPlaybackPipeline) {
+      return AudioPlayer(
+        audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+      );
+    }
+    return AudioPlayer();
+  }
+
+  bool get _usesEqualizerPlaybackPipeline => isEqualizerPlaybackPipelineEnabled(
+    isWeb: kIsWeb,
+    platform: defaultTargetPlatform,
+  );
+
+  Future<bool> prepareEqualizer() async {
+    if (!supportsEqualizer || _player.audioSource == null) {
+      return false;
+    }
+    if (_equalizerParameters != null && _equalizerState.bands.isNotEmpty) {
+      return true;
+    }
+
+    try {
+      final parameters = await _equalizer.parameters;
+      _equalizerParameters = parameters;
+      _equalizerState = _equalizerState.copyWith(
+        bands: _buildEqualizerBands(parameters),
+      );
+      await _applyEqualizerStateToPlayer(persist: false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Equalizer initialization failed: $e');
+      return false;
+    }
+  }
+
+  Future<void> setEqualizerEnabled(
+    bool enabled, {
+    bool syncRemote = true,
+  }) async {
+    if (enabled &&
+        supportsEqualizer &&
+        _player.audioSource != null &&
+        _equalizerParameters == null) {
+      await prepareEqualizer();
+    }
+    _equalizerState = _equalizerState.copyWith(enabled: enabled);
+    notifyListeners();
+
+    if (supportsEqualizer) {
+      try {
+        await _equalizer.setEnabled(enabled);
+        if (enabled) {
+          await _applyEqualizerStateToPlayer(persist: false);
+        }
+      } catch (e) {
+        debugPrint('Equalizer enable toggle failed: $e');
+      }
+    }
+
+    await _persistEqualizerState(syncRemote: syncRemote);
+  }
+
+  Future<void> setEqualizerBandGain(
+    int bandIndex,
+    double gain, {
+    bool persist = true,
+  }) async {
+    if (supportsEqualizer &&
+        _player.audioSource != null &&
+        _equalizerParameters == null) {
+      await prepareEqualizer();
+    }
+
+    final parameters = _equalizerParameters;
+    final clamped = parameters == null
+        ? gain
+        : gain.clamp(parameters.minDecibels, parameters.maxDecibels).toDouble();
+
+    _equalizerState = _equalizerState.withBandGain(bandIndex, clamped);
+    notifyListeners();
+
+    if (supportsEqualizer) {
+      try {
+        await _equalizer.setEnabled(true);
+        final parameters = _equalizerParameters;
+        if (parameters != null) {
+          for (final band in parameters.bands) {
+            if (band.index == bandIndex) {
+              await band.setGain(clamped);
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Equalizer band update failed: $e');
+      }
+    }
+
+    if (persist) {
+      await _persistEqualizerState(syncRemote: true);
+    }
+  }
+
+  List<EqualizerBandSetting> _buildEqualizerBands(
+    AndroidEqualizerParameters parameters,
+  ) {
+    if (_equalizerState.bands.isEmpty) {
+      final bands = parameters.bands
+          .map(
+            (band) => EqualizerBandSetting(
+              index: band.index,
+              centerFrequency: band.centerFrequency,
+              gain: band.gain,
+            ),
+          )
+          .toList(growable: false);
+      if (_equalizerState.presetId != EqualizerPresetId.off.id &&
+          _equalizerState.presetId != EqualizerPresetId.custom.id) {
+        return EqualizerStateSnapshot.fromPreset(
+          presetId: _equalizerState.presetId,
+          enabled: _equalizerState.enabled,
+          bands: bands,
+        ).bands;
+      }
+      return bands;
+    }
+
+    final savedByIndex = {
+      for (final band in _equalizerState.bands) band.index: band,
+    };
+    return parameters.bands
+        .map((band) {
+          final saved = savedByIndex[band.index];
+          return EqualizerBandSetting(
+            index: band.index,
+            centerFrequency: band.centerFrequency,
+            gain: saved?.gain ?? band.gain,
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<void> loadQueue(
@@ -506,10 +717,21 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
   }
 
-  Future<AudioSource> _buildAudioSource(Track track) async {
+  AudioSource _networkAudioSource(Track track, MediaItem item) {
+    return AudioSource.uri(
+      Uri.parse('$_baseUrl/api/tracks/${track.id}/stream?auth=$_token'),
+      headers: {'Authorization': 'Bearer $_token'},
+      tag: item,
+    );
+  }
+
+  Future<AudioSource> _buildAudioSource(
+    Track track, {
+    required bool preferCachedFile,
+  }) async {
     final item = _mediaItemForTrack(track);
 
-    if (_cacheService != null) {
+    if (preferCachedFile && _cacheService != null) {
       final cacheFile = await _cacheService!.getCachedTrack(
         track.id,
         track.extension,
@@ -523,11 +745,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       throw StateError('Playback auth is missing.');
     }
 
-    return AudioSource.uri(
-      Uri.parse('$_baseUrl/api/tracks/${track.id}/stream?auth=$_token'),
-      headers: {'Authorization': 'Bearer $_token'},
-      tag: item,
-    );
+    return _networkAudioSource(track, item);
   }
 
   Future<void> _ensureTrackCaching(Track track) async {
@@ -568,8 +786,19 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
 
-    final sources = await Future.wait(_queue.map(_buildAudioSource));
     final safeIndex = initialIndex.clamp(0, _queue.length - 1);
+    final cachePlan = buildQueueCachedSourcePlan(
+      queueLength: _queue.length,
+      currentIndex: safeIndex,
+    );
+    final sources = await Future.wait(
+      _queue.asMap().entries.map(
+        (entry) => _buildAudioSource(
+          entry.value,
+          preferCachedFile: cachePlan[entry.key],
+        ),
+      ),
+    );
     _suppressedIndexEvents++;
     await _player.setAudioSources(
       sources,
@@ -580,6 +809,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_player.shuffleModeEnabled) {
       await _player.shuffle();
     }
+    await _applyEqualizerPresetToPlayer();
     _preparedQueueSignature = signature;
     _activeTrackId = null;
     _currentIndex = _player.currentIndex ?? safeIndex;
@@ -654,6 +884,28 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     await prefs.setString(_lyricOffsetStorageKey, jsonEncode(_lyricOffsets));
     await _syncRemotePreference('player_lyric_offsets', _lyricOffsets);
+  }
+
+  Future<void> _persistEqualizerState({required bool syncRemote}) async {
+    final prefs = _prefs;
+    if (prefs == null) {
+      return;
+    }
+    await prefs.setString(_equalizerPresetStorageKey, _equalizerState.presetId);
+    await prefs.setString(
+      _equalizerStateStorageKey,
+      jsonEncode(_equalizerState.toJson()),
+    );
+    if (syncRemote) {
+      await _syncRemotePreference(
+        'player_equalizer_preset',
+        _equalizerState.presetId,
+      );
+      await _syncRemotePreference(
+        'player_equalizer_state',
+        _equalizerState.toJson(),
+      );
+    }
   }
 
   Duration _savedTrackPosition(Track track) {
@@ -781,7 +1033,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  Future<void> applyRemotePreferences(Map<String, dynamic> data) async {
+  Future<void> applyRemotePreferences(
+    Map<String, dynamic> data, {
+    bool autoPlayOnRestore = false,
+  }) async {
     final remoteOffsets = data['player_lyric_offsets'];
     if (remoteOffsets is Map<String, dynamic>) {
       _lyricOffsets
@@ -800,10 +1055,118 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (prefs != null) {
         await prefs.setString(_sessionStorageKey, jsonEncode(remoteSession));
         await _restoreSession();
+        if (_queue.isNotEmpty && _token != null && _baseUrl != null) {
+          await _playCurrentTrack(
+            autoPlay: resolveAutoPlayBehavior(
+              trigger: PlaybackResumeTrigger.launchRestore,
+              wasPlaying: _pendingRestoreShouldResume,
+              autoPlayOnLaunchRestore: autoPlayOnRestore,
+            ),
+            recordHistory: false,
+            recordPlayback: false,
+            initialPosition: _pendingRestorePosition,
+          );
+        }
+      }
+    }
+
+    final remoteEqualizerState = data['player_equalizer_state'];
+    if (remoteEqualizerState is Map<String, dynamic>) {
+      _equalizerState = EqualizerStateSnapshot.fromJson(remoteEqualizerState);
+      if (_player.audioSource != null) {
+        await prepareEqualizer();
+      }
+      await _applyEqualizerStateToPlayer(persist: false);
+    } else {
+      final remotePresetId = data['player_equalizer_preset'];
+      if (remotePresetId is String && remotePresetId.isNotEmpty) {
+        await setEqualizerPreset(remotePresetId, syncRemote: false);
       }
     }
 
     notifyListeners();
+  }
+
+  Future<void> setEqualizerPreset(
+    String presetId, {
+    bool syncRemote = true,
+  }) async {
+    final profile = EqualizerPresetProfile.fromId(presetId);
+    if (_player.audioSource != null) {
+      await prepareEqualizer();
+    }
+
+    final baseBands = _equalizerState.bands;
+    _equalizerState = EqualizerStateSnapshot.fromPreset(
+      presetId: profile.id,
+      enabled: profile.id != EqualizerPresetId.off.id,
+      bands: baseBands,
+    );
+    notifyListeners();
+
+    await _applyEqualizerStateToPlayer(persist: syncRemote);
+  }
+
+  Future<void> _applyEqualizerStateToPlayer({required bool persist}) async {
+    if (!supportsEqualizer) {
+      if (persist) {
+        await _persistEqualizerState(syncRemote: true);
+      }
+      return;
+    }
+
+    if (_player.audioSource != null &&
+        (_equalizerParameters == null || _equalizerState.bands.isEmpty)) {
+      await prepareEqualizer();
+    }
+
+    try {
+      final shouldEnable =
+          _equalizerState.enabled &&
+          _equalizerState.presetId != EqualizerPresetId.off.id;
+      await _equalizer.setEnabled(shouldEnable);
+      if (shouldEnable && _equalizerParameters != null) {
+        final gainsByIndex = {
+          for (final band in _equalizerState.bands) band.index: band.gain,
+        };
+        for (final band in _equalizerParameters!.bands) {
+          final gain = gainsByIndex[band.index];
+          if (gain != null) {
+            await band.setGain(
+              gain
+                  .clamp(
+                    _equalizerParameters!.minDecibels,
+                    _equalizerParameters!.maxDecibels,
+                  )
+                  .toDouble(),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Equalizer state apply failed: $e');
+    }
+
+    if (persist) {
+      await _persistEqualizerState(syncRemote: true);
+    } else {
+      final prefs = _prefs;
+      if (prefs != null) {
+        await prefs.setString(
+          _equalizerStateStorageKey,
+          jsonEncode(_equalizerState.toJson()),
+        );
+        await prefs.setString(
+          _equalizerPresetStorageKey,
+          _equalizerState.presetId,
+        );
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> _applyEqualizerPresetToPlayer() async {
+    await _applyEqualizerStateToPlayer(persist: false);
   }
 
   Future<void> _playCurrentTrack({
@@ -886,21 +1249,31 @@ class MusicPlayerHandler extends BaseAudioHandler
         return;
       }
 
-      if (_player.loopMode == LoopMode.one) {
-        _clearTrackProgress(currentTrack?.id);
-        await _seekToQueueIndex(_currentIndex, position: Duration.zero);
-        await _syncActiveTrackState(
-          force: true,
-          recordHistory: false,
-          recordPlayback: false,
-        );
-        await _player.play();
-        return;
-      }
-
       _clearTrackProgress(currentTrack?.id);
-      await _seekToQueueIndex(_currentIndex, position: Duration.zero);
-      await _player.pause();
+      final action = resolvePlaybackCompletionAction(
+        nextIndex: _player.nextIndex,
+        isSingleTrackLoop: _player.loopMode == LoopMode.one,
+      );
+
+      switch (action.kind) {
+        case PlaybackCompletionKind.restartCurrent:
+          await _seekToQueueIndex(_currentIndex, position: Duration.zero);
+          await _syncActiveTrackState(
+            force: true,
+            recordHistory: false,
+            recordPlayback: false,
+          );
+          await _player.play();
+          return;
+        case PlaybackCompletionKind.playNext:
+          _currentIndex = action.nextIndex!;
+          notifyListeners();
+          await _playCurrentTrack(autoPlay: true, restoreTrackPosition: false);
+          return;
+        case PlaybackCompletionKind.pauseCurrent:
+          await _seekToQueueIndex(_currentIndex, position: Duration.zero);
+          await _player.pause();
+      }
       await _persistSession();
     } finally {
       _isHandlingCompletion = false;
@@ -947,7 +1320,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     _currentIndex = nextIndex;
     notifyListeners();
     await _playCurrentTrack(
-      autoPlay: _player.playing,
+      autoPlay: resolveAutoPlayBehavior(
+        trigger: PlaybackResumeTrigger.manualSkip,
+        wasPlaying: _player.playing,
+        autoPlayOnLaunchRestore: false,
+      ),
       restoreTrackPosition: false,
     );
   }
@@ -970,7 +1347,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     _currentIndex = previousIndex;
     notifyListeners();
     await _playCurrentTrack(
-      autoPlay: _player.playing,
+      autoPlay: resolveAutoPlayBehavior(
+        trigger: PlaybackResumeTrigger.manualSkip,
+        wasPlaying: _player.playing,
+        autoPlayOnLaunchRestore: false,
+      ),
       restoreTrackPosition: false,
     );
   }
@@ -1170,8 +1551,10 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<String?> getLyrics(String trackId) async {
     if (_baseUrl == null || _token == null) return null;
     try {
-      final url = '$_baseUrl/api/tracks/$trackId/lyrics?auth=$_token';
-      final response = await Dio().get(url);
+      final response = await _networkDio.get(
+        '$_baseUrl/api/tracks/$trackId/lyrics',
+        options: _authorizedOptions(),
+      );
       if (response.data != null && response.data['success'] == true) {
         return response.data['lyrics'] as String?;
       }
@@ -1181,12 +1564,14 @@ class MusicPlayerHandler extends BaseAudioHandler
     return null;
   }
 
-  Future<void> _fetchAndParseLyrics(String trackId) async {
+  Future<void> _fetchAndParseLyrics(String trackId, {int attempt = 0}) async {
     final lyrics = await getLyrics(trackId);
     if (currentTrack?.id != trackId) {
       return;
     }
-    if (lyrics != null) {
+
+    final hasLyrics = lyrics != null && lyrics.trim().isNotEmpty;
+    if (hasLyrics) {
       _currentRawLyrics = lyrics;
       _currentLyrics = _parseLrc(
         lyrics,
@@ -1196,8 +1581,16 @@ class MusicPlayerHandler extends BaseAudioHandler
       _currentRawLyrics = null;
       _currentLyrics = [];
       _lastLyricIndex = -1;
+      if (attempt < 2) {
+        await Future.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+        if (currentTrack?.id == trackId) {
+          await _fetchAndParseLyrics(trackId, attempt: attempt + 1);
+        }
+        return;
+      }
     }
     _updateLyricInMetadata(_player.position);
+    notifyListeners();
   }
 
   void _updateMediaItemWithLyric(String? lyric) {
@@ -1280,13 +1673,17 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> _recordPlayback(String trackId) async {
     if (_baseUrl == null || _token == null) return;
     try {
-      await Dio().post(
+      await _networkDio.post(
         '$_baseUrl/api/tracks/$trackId/play',
-        options: Options(headers: {'Authorization': 'Bearer $_token'}),
+        options: _authorizedOptions(),
       );
     } catch (e) {
       debugPrint('Error recording playback: $e');
     }
+  }
+
+  Options _authorizedOptions() {
+    return Options(headers: {'Authorization': 'Bearer $_token'});
   }
 
   void _broadcastState(dynamic _) {

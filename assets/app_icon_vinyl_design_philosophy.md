@@ -1,0 +1,9 @@
+# Velvet Vinyl
+
+Velvet Vinyl treats the icon as a miniature luxury object rather than a functional badge. The center of the composition should feel like a premium black record seen under low light: dense, polished, tactile, and emotionally charged. Instead of advertising music with obvious symbols, the design should imply listening through material, reflection, and rhythm. The icon must feel quiet, expensive, and deeply considered.
+
+The dominant form is a vinyl disc suspended in a dark atmosphere. Rings, grooves, and highlights should be the language of the composition. These elements must not feel decorative or noisy; they should look meticulously controlled, as if each circular interval was tuned by hand. The outer space remains calm and generous so the disc can own the center with authority. The result should appear painstakingly crafted, balanced with expert restraint, and refined far beyond a generic music-note icon.
+
+Color should stay in a narrow, luxurious spectrum: near-black greens, smoked teal, mineral cyan, and a single cool electric-blue accent. The black of the disc should never collapse into flat emptiness; it should reveal subtle tonal depth through groove lines and reflected light. Highlights should feel like studio reflections on lacquer, not neon gimmicks. Every luminous accent must be placed with care so the icon remains elegant at both large and tiny sizes.
+
+The composition should suggest motion without literal blur. A vinyl record already carries rhythm in its concentric geometry, so movement comes from sweeping highlights, controlled arcs, and tiny evidence of spin. The craftsmanship needs to be master-level: every ring, reflection, and tonal transition should look labored over with patience. The final impression should be unmistakably musical, but in the language of premium object design rather than a simplistic symbol.
